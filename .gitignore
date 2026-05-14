@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+
+# VS Code
+.vs/
+.vscode/*.log
+
+# Logs
+logs/
+*.log
+
+# Temp
+temp/
+python/temp/
+
+# Runtime JSON
+json/*.json
+
+# CSV exports
+csv/*.csv
+
+# SketchUp backups
+*.skb
+
+# OS
+Thumbs.db
+.DS_Store

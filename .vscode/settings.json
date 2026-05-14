@@ -1,0 +1,13 @@
+{
+  "python.defaultInterpreterPath": "python",
+
+  "files.autoSave": "afterDelay",
+
+  "editor.formatOnSave": true,
+
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+
+  "editor.minimap.enabled": false,
+
+  "explorer.compactFolders": false
+}

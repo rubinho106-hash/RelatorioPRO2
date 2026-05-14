@@ -1,0 +1,38 @@
+{
+  "version": "2.0.0",
+
+  "tasks": [
+
+    {
+      "label": "Run IFC Parser",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "python/extract_ifc.py"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+
+    {
+      "label": "Run Analytics",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "python/analytics.py"
+      ]
+    },
+
+    {
+      "label": "Generate Groups",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "python/grouping.py"
+      ]
+    }
+
+  ]
+}
