@@ -27,6 +27,7 @@ let objects = [];
 let savedSettings = {};
 let layerList = [];
 let dynamicList = [];
+let dynamicSchemaByKey = {};
 let customKeys = [];
 let sumList = [];
 let sortColumn = 'ordinal';
@@ -49,6 +50,9 @@ let simpleTagModelLastSignature = '';  // Cache signature para buildSimpleTagMod
 // Legacy access provided via LegacyAdapter (js/legacy/adapter.js)
 // Do NOT create new global variables for state management
 let dashboardModeEventsBound = false;
+let outboundSelectionKey = '';
+let outboundSelectionLockUntil = 0;
+let dashboardSelectionPulseTimer = null;
 const DEFAULT_TAG_IFC_RULES = {
   VIGA: ['IFCBEAM'],
   PILAR: ['IFCCOLUMN'],
@@ -125,12 +129,21 @@ document.addEventListener('DOMContentLoaded', function () {
   // =========================================================================
   _initializeEventDrivenArchitecture();
 
+  const canRequestLiveData =
+    window.Bridge &&
+    typeof window.Bridge.requestDataRefresh === 'function' &&
+    typeof window.Bridge.hasMethod === 'function' &&
+    window.Bridge.hasMethod('request_data');
+
+  // Always prefer live SketchUp model data when available.
+  if (canRequestLiveData) {
+    window.Bridge.requestDataRefresh();
+    return;
+  }
+
+  // Fallback for browser/dev mode (without SketchUp bridge).
   if (window.RelatorioDataLoader && typeof window.RelatorioDataLoader.bootstrapFromJson === 'function') {
-    window.RelatorioDataLoader.bootstrapFromJson().then(function (loaded) {
-      if (!loaded && window.Bridge && typeof window.Bridge.requestDataRefresh === 'function') {
-        window.Bridge.requestDataRefresh();
-      }
-    });
+    window.RelatorioDataLoader.bootstrapFromJson();
   }
 });
 
@@ -236,7 +249,72 @@ function _initializeEventDrivenArchitecture() {
     }
   });
 
+  // SketchUp -> Dashboard: sync selected entity from model to dashboard state.
+  window.addEventListener('relatoriopro:selectionChanged', function (event) {
+    try {
+      const detail = event && event.detail ? event.detail : {};
+      const ids = Array.isArray(detail.ids) ? detail.ids : [];
+
+      if (ids.length === 0) {
+        AppState.setCurrentElement(null);
+        if (typeof RenderManager !== 'undefined' && RenderManager.renderAll) {
+          RenderManager.renderAll();
+        }
+        return;
+      }
+
+      const firstId = String(ids[0] || '').trim();
+      if (!firstId) { return; }
+
+      // Ignore immediate echo when selection originated from dashboard click.
+      if (Date.now() < outboundSelectionLockUntil && firstId === outboundSelectionKey) {
+        return;
+      }
+
+      const current = String((typeof AppState !== 'undefined' && AppState.getCurrentElement) ? (AppState.getCurrentElement() || '') : '').trim();
+      if (current === firstId) {
+        pulseDashboardSelection('sketchup');
+        return;
+      }
+
+      // focusInModel=false avoids echo-loop since selection already came from SketchUp.
+      if (typeof window.selectElementByKey === 'function') {
+        window.selectElementByKey(firstId, false, 'sketchup');
+      }
+    } catch (err) {
+      if (window.console && console.warn) {
+        console.warn('[RelatorioPRO] selectionChanged sync failed:', err);
+      }
+    }
+  });
+
   customLog('(+) Event-driven architecture initialized with state proxies');
+}
+
+function buildDynamicSchemaMap(dynamicSchema) {
+  'use strict';
+  const map = {};
+  (Array.isArray(dynamicSchema) ? dynamicSchema : []).forEach(function (item) {
+    if (!item || typeof item !== 'object') { return; }
+    const key = String(item.key || '').trim();
+    if (!key) { return; }
+    map[key] = item;
+  });
+  return map;
+}
+
+function getColumnDisplayLabel(key) {
+  'use strict';
+  const k = String(key || '').trim();
+  if (!k) { return ''; }
+  if (userLabels[k]) { return userLabels[k]; }
+
+  const schema = dynamicSchemaByKey[k];
+  if (schema && schema.label) {
+    return String(schema.label);
+  }
+
+  return k;
 }
 
 // UPDATE DATA — chamado pelo Ruby via execute_script
@@ -347,9 +425,12 @@ function updateData(data, saved_settings, layer_list, dynamic_list, custom_keys,
     if (saved) { userLabels[k] = saved; }
   });
 
-  dynamicList = dynamic_list;
+  dynamicList = Array.isArray(dynamic_list) ? dynamic_list : [];
+  dynamicSchemaByKey = buildDynamicSchemaMap(dynamicList);
   customKeys = custom_keys;
   const customKey = customKeys[0];
+  const customSchema = customKey ? dynamicSchemaByKey[customKey] : null;
+  const customKeyLabel = customSchema && customSchema.label ? String(customSchema.label) : customKey;
   customLog('(!) customKey:', customKey);
 
   currentLanguage = localStorage.getItem('language') || 'pt';
@@ -404,11 +485,15 @@ function updateData(data, saved_settings, layer_list, dynamic_list, custom_keys,
     th.setAttribute('data-placement', 'top');
     th.setAttribute('title', 'Click to sort table');
 
-    // Label: usa nome customizado se existir, senão usa tradução
+    // Label: nome customizado > schema dinâmico > tradução padrão
     if (userLabels[key]) {
       th.textContent = userLabels[key];
       th.setAttribute('no-translate', key);
       th.classList.add('modified');
+    } else if (dynamicSchemaByKey[key] && dynamicSchemaByKey[key].label) {
+      th.textContent = String(dynamicSchemaByKey[key].label);
+      th.setAttribute('no-translate', key);
+      th.classList.remove('modified');
     } else {
       th.setAttribute('data-translate', key);
       th.textContent = key;
@@ -483,7 +568,7 @@ function updateData(data, saved_settings, layer_list, dynamic_list, custom_keys,
       td.appendChild(badge);
     } else if (key.includes('custom')) {
       badge.className = 'badge badge-pill badge-dark';
-      badge.textContent = customKey || '';
+      badge.textContent = customKeyLabel || '';
       td.appendChild(badge);
     }
 
@@ -1702,8 +1787,14 @@ function addColumnToOption(data, table) {
     const labelEl = document.createElement('label');
     labelEl.classList.add('custom-control-label');
     labelEl.setAttribute('for', key);
-    labelEl.setAttribute('data-translate', key);
-    labelEl.textContent = key;
+    const displayLabel = getColumnDisplayLabel(key);
+    if (displayLabel && displayLabel !== key) {
+      labelEl.setAttribute('no-translate', key);
+      labelEl.textContent = displayLabel;
+    } else {
+      labelEl.setAttribute('data-translate', key);
+      labelEl.textContent = key;
+    }
 
     divCheck.appendChild(inputEl);
     divCheck.appendChild(labelEl);
@@ -2542,10 +2633,20 @@ function getDashboardMode() {
   'use strict';
   // All state queries must go through AppState now
   if (typeof AppState !== 'undefined' && AppState.getMode) {
-    return AppState.getMode();
+    return String(AppState.getMode() || '').toLowerCase();
   }
   // Fallback (should not happen if AppState loaded)
   return 'global';
+}
+
+function renderMenu() {
+  'use strict';
+  // Legacy no-op: menu rendering is handled by RenderManager + SidebarModule.
+}
+
+function renderDashboardBreadcrumb() {
+  'use strict';
+  // Legacy no-op: breadcrumb rendering is handled by RenderManager + BreadcrumbModule.
 }
 
 function getElementKey(e) {
@@ -2575,6 +2676,167 @@ function escapeHtml(text) {
     .replace(/'/g, '&#39;');
 }
 
+function normalizeQueryToken(value) {
+  'use strict';
+  return String(value == null ? '' : value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function resolveQueryFieldKey(rawField) {
+  'use strict';
+  const token = normalizeQueryToken(rawField);
+  if (!token) { return ''; }
+
+  const aliases = {
+    classe_ifc: 'ifc',
+    ifc_class: 'ifc',
+    ifc: 'ifc',
+    tag: 'tag',
+    etiqueta: 'tag',
+    pavimento: 'storey',
+    storey: 'storey',
+    volume: 'volume_total',
+    volume_total: 'volume_total',
+    area: 'area_total',
+    area_total: 'area_total',
+    comprimento: 'metro_linear_total',
+    metro_linear: 'metro_linear_total',
+    metro_linear_total: 'metro_linear_total',
+    material: 'material',
+    instancia: 'instance',
+    instance: 'instance',
+    nome: 'instance',
+    id: 'id',
+    entity: 'entity'
+  };
+
+  if (aliases[token]) { return aliases[token]; }
+
+  const normalizedColumns = Object.keys(dynamicSchemaByKey || {}).reduce(function (acc, key) {
+    acc[normalizeQueryToken(key)] = key;
+    const item = dynamicSchemaByKey[key] || {};
+    if (item.label) { acc[normalizeQueryToken(item.label)] = key; }
+    if (item.property) { acc[normalizeQueryToken(item.property)] = key; }
+    return acc;
+  }, {});
+
+  return normalizedColumns[token] || rawField;
+}
+
+function getRowQueryValue(row, key) {
+  'use strict';
+  if (!row) { return ''; }
+  if (row[key] != null) { return row[key]; }
+  if (key === 'volume_total') { return row.volume_total || row.volume || 0; }
+  if (key === 'area_total') { return row.area_total || row.area || 0; }
+  if (key === 'metro_linear_total') { return row.metro_linear_total || row.comprimento || 0; }
+  return '';
+}
+
+function compareQueryValues(leftValue, op, rightRaw) {
+  'use strict';
+  const leftText = String(leftValue == null ? '' : leftValue).trim();
+  const rightText = String(rightRaw == null ? '' : rightRaw).trim();
+
+  const leftNumber = Number(parseLocalizedNumberDisplay(leftValue));
+  const rightNumber = Number(parseLocalizedNumberDisplay(rightText));
+  const bothNumeric = Number.isFinite(leftNumber) && Number.isFinite(rightNumber);
+
+  const leftNorm = normalizeQueryToken(leftText);
+  const rightNorm = normalizeQueryToken(rightText);
+
+  if (op === 'is empty') {
+    return leftNorm === '' || leftNorm === '-' || leftNorm === 'null' || leftNorm === 'undefined';
+  }
+  if (op === 'is not empty') {
+    return !(leftNorm === '' || leftNorm === '-' || leftNorm === 'null' || leftNorm === 'undefined');
+  }
+
+  if (bothNumeric) {
+    if (op === '>') { return leftNumber > rightNumber; }
+    if (op === '>=') { return leftNumber >= rightNumber; }
+    if (op === '<') { return leftNumber < rightNumber; }
+    if (op === '<=') { return leftNumber <= rightNumber; }
+    if (op === '=' || op === '==') { return leftNumber === rightNumber; }
+    if (op === '!=') { return leftNumber !== rightNumber; }
+  }
+
+  if (op === '=' || op === '==') { return leftNorm === rightNorm; }
+  if (op === '!=') { return leftNorm !== rightNorm; }
+  if (op === 'contains' || op === '~') { return leftNorm.indexOf(rightNorm) !== -1; }
+  if (op === 'not contains') { return leftNorm.indexOf(rightNorm) === -1; }
+
+  return leftNorm.indexOf(rightNorm) !== -1;
+}
+
+function parseQueryClause(rawClause) {
+  'use strict';
+  const clause = String(rawClause || '').trim();
+  if (!clause) { return null; }
+
+  const unary = clause.match(/^(.+?)\s+(is\s+not\s+empty|is\s+empty)$/i);
+  if (unary) {
+    return {
+      field: resolveQueryFieldKey(unary[1]),
+      op: normalizeQueryToken(unary[2]).replace(/\s+/g, ' '),
+      value: ''
+    };
+  }
+
+  const binary = clause.match(/^(.+?)\s*(>=|<=|!=|==|=|>|<|~|contains|not\s+contains)\s*(.+)$/i);
+  if (!binary) { return null; }
+
+  return {
+    field: resolveQueryFieldKey(binary[1]),
+    op: normalizeQueryToken(binary[2]).replace(/\s+/g, ' '),
+    value: String(binary[3] || '').trim().replace(/^['\"]|['\"]$/g, '')
+  };
+}
+
+function applyQueryEngineFilter(list, rawSearch) {
+  'use strict';
+  const source = Array.isArray(list) ? list : [];
+  const query = String(rawSearch || '').trim();
+  if (!query) { return source; }
+
+  const hasQuerySyntax = /(>=|<=|!=|==|=|>|<|\bcontains\b|\bis\s+empty\b|\bis\s+not\s+empty\b)/i.test(query);
+  if (!hasQuerySyntax) {
+    const normalizedSearch = query.toLowerCase();
+    return source.filter(function (e) {
+      const label = String(e && (e.instance || e.nome || e.entity) ? (e.instance || e.nome || e.entity) : '').toLowerCase();
+      const ifc = String(e && e.ifc ? e.ifc : '').toLowerCase();
+      const storey = String(e && (e.storey || e.pavimento) ? (e.storey || e.pavimento) : '').toLowerCase();
+      const pid = String(getElementKey(e) || '').toLowerCase();
+      return label.indexOf(normalizedSearch) !== -1 ||
+        ifc.indexOf(normalizedSearch) !== -1 ||
+        storey.indexOf(normalizedSearch) !== -1 ||
+        pid.indexOf(normalizedSearch) !== -1;
+    });
+  }
+
+  const orGroups = query.split(/\s+OR\s+/i).map(function (group) {
+    return String(group || '').trim();
+  }).filter(Boolean);
+
+  return source.filter(function (row) {
+    return orGroups.some(function (group) {
+      const andClauses = group.split(/\s+AND\s+/i).map(function (clause) {
+        return parseQueryClause(clause);
+      }).filter(Boolean);
+
+      if (andClauses.length === 0) { return false; }
+
+      return andClauses.every(function (clause) {
+        const leftValue = getRowQueryValue(row, clause.field);
+        return compareQueryValues(leftValue, clause.op, clause.value);
+      });
+    });
+  });
+}
+
 // ✅ HARDENING: renderDashboardBreadcrumb() REMOVED
 // This function is now handled by RenderManager._renderBreadcrumb()
 // Breadcrumb is now completely state-derived from AppState.getState().navigation
@@ -2600,7 +2862,18 @@ function selectElementByKey(key, focusInModel) {
   const selected = findElementByKey(wanted);
   if (!selected) { return; }
 
+  const source = arguments.length >= 3 ? String(arguments[2] || 'dashboard') : 'dashboard';
+
   const rowTag = String(selected.tag || '').trim();
+  const currentTagValue = String((typeof AppState !== 'undefined' && AppState.getCurrentTag) ? (AppState.getCurrentTag() || '') : '').trim();
+  const currentElementValue = String((typeof AppState !== 'undefined' && AppState.getCurrentElement) ? (AppState.getCurrentElement() || '') : '').trim();
+  const hasStateChange = currentElementValue !== wanted || (rowTag && rowTag !== currentTagValue);
+
+  if (!hasStateChange && !focusInModel) {
+    pulseDashboardSelection(source);
+    return;
+  }
+
   if (rowTag && window.tagModel && window.tagModel[rowTag]) {
     AppState.setCurrentTag(rowTag);
     carregarPavimentos(rowTag);
@@ -2610,6 +2883,9 @@ function selectElementByKey(key, focusInModel) {
   AppState.setCurrentElement(wanted);
 
   if (focusInModel) {
+    outboundSelectionKey = wanted;
+    outboundSelectionLockUntil = Date.now() + 500;
+
     // ✅ NOVO: Usar Bridge em vez de chamar focusEntity diretamente
     if (typeof Bridge !== 'undefined' && Bridge.highlightEntity) {
       Bridge.highlightEntity(wanted);
@@ -2628,6 +2904,28 @@ function selectElementByKey(key, focusInModel) {
   if (typeof RenderManager === 'undefined') {
     renderDashboard();
   }
+
+  pulseDashboardSelection(source);
+}
+
+function pulseDashboardSelection(source) {
+  'use strict';
+  const target = document.getElementById('globalSummary');
+  if (!target) { return; }
+
+  const color = source === 'sketchup' ? 'rgba(14, 116, 144, 0.58)' : 'rgba(22, 163, 74, 0.58)';
+  target.style.transition = 'box-shadow 180ms ease, transform 180ms ease';
+  target.style.boxShadow = '0 0 0 2px ' + color;
+  target.style.transform = 'translateY(-1px)';
+
+  if (dashboardSelectionPulseTimer) {
+    clearTimeout(dashboardSelectionPulseTimer);
+  }
+
+  dashboardSelectionPulseTimer = setTimeout(function () {
+    target.style.boxShadow = '';
+    target.style.transform = '';
+  }, 260);
 }
 
 function backToTagMode() {
@@ -2940,10 +3238,11 @@ function carregarPavimentos(tag) {
 function getTagElementsByFilter(grupo) {
   'use strict';
   const elementos = Array.isArray(grupo && grupo.elementos) ? grupo.elementos : [];
-  if (!currentStoreyFilter) { return elementos; }
-  return elementos.filter(function (e) {
+  const byStorey = !currentStoreyFilter ? elementos : elementos.filter(function (e) {
     return String((e && (e.storey || e.pavimento)) || '') === currentStoreyFilter;
   });
+
+  return applyQueryEngineFilter(byStorey, dashboardSearchTerm);
 }
 
 function summarizeElements(elements) {
@@ -2995,17 +3294,7 @@ function renderTabela(elements) {
 
   if (tabelaWrapper) { setDashboardPanelVisible(tabelaWrapper, true); }
   const list = Array.isArray(elements) ? elements : [];
-  const normalizedSearch = String(dashboardSearchTerm || '').trim().toLowerCase();
-  let filteredElements = !normalizedSearch ? list : list.filter(function (e) {
-    const label = String(e && (e.instance || e.nome || e.entity) ? (e.instance || e.nome || e.entity) : '').toLowerCase();
-    const ifc = String(e && e.ifc ? e.ifc : '').toLowerCase();
-    const storey = String(e && (e.storey || e.pavimento) ? (e.storey || e.pavimento) : '').toLowerCase();
-    const pid = String(getElementKey(e) || '').toLowerCase();
-    return label.indexOf(normalizedSearch) !== -1 ||
-      ifc.indexOf(normalizedSearch) !== -1 ||
-      storey.indexOf(normalizedSearch) !== -1 ||
-      pid.indexOf(normalizedSearch) !== -1;
-  });
+  let filteredElements = applyQueryEngineFilter(list, dashboardSearchTerm);
 
   // Evita tela "vazia" em TAG por busca residual do contexto anterior.
   if (getDashboardMode() === 'tag' && filteredElements.length === 0 && list.length > 0) {
@@ -3059,6 +3348,28 @@ function renderTabela(elements) {
 // ✅ HARDENING: setDashboardSearchTerm() and clearDashboardSearch() REMOVED
 // Use AppState.setSearchTerm() instead
 // Legacy code using these will be routed through AppState via EventBus
+
+function setDashboardSearchTerm(term) {
+  'use strict';
+  const value = String(term == null ? '' : term);
+  const input = document.getElementById('dashboardSearchInput');
+  if (input) { input.value = value; }
+
+  if (typeof AppState !== 'undefined' && AppState.setSearchTerm) {
+    AppState.setSearchTerm(value);
+  }
+
+  if (typeof RenderManager !== 'undefined' && RenderManager.renderAll) {
+    RenderManager.renderAll();
+  } else {
+    renderDashboard();
+  }
+}
+
+function clearDashboardSearch() {
+  'use strict';
+  setDashboardSearchTerm('');
+}
 
 function getAllTagElements() {
   'use strict';
@@ -3483,3 +3794,4 @@ window.renderTag = renderTag;
 window.focusEntity = focusEntity;
 window.renderFirst = renderFirst;
 window.setDashboardSearchTerm = setDashboardSearchTerm;
+window.clearDashboardSearch = clearDashboardSearch;

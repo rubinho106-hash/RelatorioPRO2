@@ -79,9 +79,9 @@ const Bridge = (() => {
      */
     highlightEntity(entityId) {
       if (!entityId) return;
-      
+
       EventBus.emit(EventBus.Events.SELECTION_HIGHLIGHT, { entityId });
-      
+
       if (Array.isArray(entityId)) {
         entityId.forEach(id => _safeCall('highlight', [String(id)]));
       } else {
@@ -128,7 +128,7 @@ const Bridge = (() => {
      */
     selectEntities(entityIds) {
       if (!Array.isArray(entityIds)) return;
-      
+
       entityIds.forEach(id => {
         _safeCall('select_entity', [String(id)]);
       });
@@ -140,6 +140,12 @@ const Bridge = (() => {
     requestDataRefresh() {
       console.log('[Bridge] Requesting data refresh...');
       EventBus.emit(EventBus.Events.UI_LOADING_START, { message: 'Atualizando dados...' });
+
+      // Priority 1: ask Ruby to read the CURRENT SketchUp model and push rows to UI.
+      if (this.hasMethod('request_data')) {
+        _safeCall('request_data', []);
+        return Promise.resolve(true);
+      }
 
       const hasPipelineRunner = this.hasMethod('run_full_pipeline');
       if (hasPipelineRunner) {
@@ -204,8 +210,8 @@ const Bridge = (() => {
      */
     getAvailableMethods() {
       if (!isSketchUpAvailable()) return [];
-      
-      return Object.keys(window.sketchup).filter(key => 
+
+      return Object.keys(window.sketchup).filter(key =>
         typeof window.sketchup[key] === 'function'
       );
     },

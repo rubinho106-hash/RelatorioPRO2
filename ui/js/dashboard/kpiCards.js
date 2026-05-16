@@ -80,7 +80,8 @@ const KPICardsModule = (() => {
       return;
     }
 
-    const elementos = _getTagElementsByFilter(grupo, state.filters.storey);
+    const storeyFilter = state && state.filters ? state.filters.storey : state.storey;
+    const elementos = _getTagElementsByFilter(grupo, storeyFilter);
     const resumo = _summarizeElements(elementos);
 
     const totalElementosTag = Number(resumo.totalElementos || 0);
@@ -103,7 +104,7 @@ const KPICardsModule = (() => {
       ? Math.max(0, ((1 - (inconsistenciasTag / totalElementosTag)) * 100))
       : 100;
 
-    const filtroPav = state.filters.storey ? state.filters.storey : 'Todos os pavimentos';
+    const filtroPav = storeyFilter ? storeyFilter : 'Todos os pavimentos';
 
     container.innerHTML =
       '<div class="summary-card"><h4>TAG Selecionada</h4><p>' + tag + '</p><span class="meta">Pavimento: ' + filtroPav + '</span></div>' +

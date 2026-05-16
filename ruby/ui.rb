@@ -10,11 +10,6 @@ module RelatorioPRO
 			dialog.add_action_callback('run_full_pipeline') do |_ctx|
 				execute_pipeline_and_notify(dialog, :full)
 			end
-
-			# Legacy compatibility: existing frontend can still call request_data.
-			dialog.add_action_callback('request_data') do |_ctx|
-				execute_pipeline_and_notify(dialog, :extract_only)
-			end
 		end
 
 		def execute_pipeline_and_notify(dialog, mode = :full)

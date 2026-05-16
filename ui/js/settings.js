@@ -80,19 +80,23 @@ function changeVolume(id, callback, logMessage) {
 }
 
 document.addEventListener("DOMContentLoaded", function () {
+  const sketchupApi = (window.sketchup && typeof window.sketchup === 'object') ? window.sketchup : {};
+  const noop = function () {};
 
-  changeRound("roundLength", sketchup.roundLength, "(Settings Units) 1a. Round Length selected: ");
-  changeRound("roundArea", sketchup.roundArea, "(Settings Units) 1b. Round Area selected: ");
-  changeRound("roundVolume", sketchup.roundVolume, "(Settings Units) 1c. Round Volume selected: ");
+  changeRound("roundLength", typeof sketchupApi.roundLength === 'function' ? sketchupApi.roundLength : noop, "(Settings Units) 1a. Round Length selected: ");
+  changeRound("roundArea", typeof sketchupApi.roundArea === 'function' ? sketchupApi.roundArea : noop, "(Settings Units) 1b. Round Area selected: ");
+  changeRound("roundVolume", typeof sketchupApi.roundVolume === 'function' ? sketchupApi.roundVolume : noop, "(Settings Units) 1c. Round Volume selected: ");
   
-  changeLength("formatLength", sketchup.formatLength, "(Settings Units) 2a. Length Unit selected: ");
-  changeArea("formatArea", sketchup.formatArea, "(Settings Units) 2b. Area Unit selected: ");
-  changeVolume("formatVolume", sketchup.formatVolume, "(Settings Units) 2c. Volume Unit selected: ");
+  changeLength("formatLength", typeof sketchupApi.formatLength === 'function' ? sketchupApi.formatLength : noop, "(Settings Units) 2a. Length Unit selected: ");
+  changeArea("formatArea", typeof sketchupApi.formatArea === 'function' ? sketchupApi.formatArea : noop, "(Settings Units) 2b. Area Unit selected: ");
+  changeVolume("formatVolume", typeof sketchupApi.formatVolume === 'function' ? sketchupApi.formatVolume : noop, "(Settings Units) 2c. Volume Unit selected: ");
 
   // Decimal Separator
   document.getElementById('decimalSeparator').addEventListener('change', function () {
     const decimalSeparator = this.value;
-    sketchup.decimalSeparator(decimalSeparator);
+    if (typeof sketchupApi.decimalSeparator === 'function') {
+      sketchupApi.decimalSeparator(decimalSeparator);
+    }
     customLog('7a. (Settings) Decimal Separator selected and saved: ', decimalSeparator);
     const thousandSeparator = (decimalSeparator === ',') ? '.' : ',';
     customLog('7b. (Settings) Thousand Separator selected and saved: ', thousandSeparator);

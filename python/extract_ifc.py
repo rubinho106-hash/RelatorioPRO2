@@ -1,17 +1,22 @@
 import ifcopenshell
 import json
+import sys
 from pathlib import Path
 from ifcopenshell.util.element import get_container, get_material, get_psets
 
 print("🚀 RelatorioPRO BIM Engine")
 
-# Caminho IFC
-IFC_FILE = "sample.ifc"
+# Caminho IFC (obrigatorio)
+if len(sys.argv) <= 1:
+    print("❌ Uso: python python/extract_ifc.py <caminho_ifc>")
+    sys.exit(1)
+
+IFC_FILE = sys.argv[1]
 
 # Verifica se existe
 if not Path(IFC_FILE).exists():
     print(f"❌ Arquivo não encontrado: {IFC_FILE}")
-    exit()
+    sys.exit(1)
 
 # Abre IFC
 ifc = ifcopenshell.open(IFC_FILE)

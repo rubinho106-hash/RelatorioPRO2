@@ -2214,6 +2214,7 @@
       <span class="brand-name">PRO</span>
     </div>
     <div class="top-actions">
+      <button id="refreshDataBtn" class="btn btn-primary" type="button">Atualizar dados</button>
       <button id="exportExcel" class="btn btn-success" type="button" data-translate="exportExcel">Exportar para
         Excel</button>
       <button id="settingsBtn" type="button" title="Configurações">&#9881;</button>
@@ -2786,6 +2787,42 @@
       showModalElement(document.getElementById('settingsModal'));
     });
 
+    // Refresh button -> run full pipeline + reload JSON.
+    var refreshDataBtn = document.getElementById('refreshDataBtn');
+    if (refreshDataBtn) {
+      refreshDataBtn.addEventListener('click', function () {
+        var originalText = refreshDataBtn.textContent;
+        refreshDataBtn.disabled = true;
+        refreshDataBtn.textContent = 'Atualizando...';
+
+        var finish = function () {
+          refreshDataBtn.disabled = false;
+          refreshDataBtn.textContent = originalText;
+        };
+
+        try {
+          if (window.Bridge && typeof window.Bridge.requestDataRefresh === 'function') {
+            var result = window.Bridge.requestDataRefresh();
+            if (result && typeof result.then === 'function') {
+              result.then(finish).catch(finish);
+              return;
+            }
+          } else if (window.sketchup && typeof window.sketchup.run_full_pipeline === 'function') {
+            window.sketchup.run_full_pipeline();
+          } else if (window.sketchup && typeof window.sketchup.request_data === 'function') {
+            window.sketchup.request_data();
+          }
+        } catch (e) {
+          if (window.console && console.error) {
+            console.error('Falha ao atualizar dados:', e);
+          }
+        }
+
+        // Fallback timeout to restore the button state if no promise path is available.
+        setTimeout(finish, 1800);
+      });
+    }
+
     // Coluna button â†’ toggle col-panel dropdown
     document.getElementById('buttonColumn').addEventListener('click', function (e) {
       e.stopPropagation();
@@ -3038,7 +3075,7 @@
   <script src="js/core/renderManager.js"></script> <!-- Centralized render orchestration -->
   <script src="js/legacy/adapter.js"></script> <!-- Legacy compatibility layer -->
   <script src="js/core/quickCheck.js"></script> <!-- Quick verification tool -->
-  <script src="js/core/profiling/profiler.js"></script> <!-- Performance profiler -->
+  <script src="../archive/profiling/profiler.js"></script> <!-- Performance profiler -->
   <script src="js/contracts/dashboard.contracts.js"></script> <!-- UI contracts and validation -->
   <!-- ✅ PHASE 3: Dashboard components (modular) -->
   <script src="js/dashboard/kpiCards.js"></script> <!-- KPI cards rendering module -->

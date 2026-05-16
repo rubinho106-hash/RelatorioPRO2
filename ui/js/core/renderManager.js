@@ -113,14 +113,14 @@ const RenderManager = (() => {
 
     // Render sidebar (menu)
     if (typeof SidebarModule !== 'undefined' && SidebarModule.render) {
-      SidebarModule.render(state.navigation);
+      SidebarModule.render(state);
     } else {
       _renderMenu(state);
     }
 
     // Render breadcrumb
     if (typeof BreadcrumbModule !== 'undefined' && BreadcrumbModule.render) {
-      BreadcrumbModule.render(state.navigation);
+      BreadcrumbModule.render(state);
     } else {
       _renderBreadcrumb(state);
     }
@@ -444,11 +444,11 @@ const RenderManager = (() => {
     globalItem.className = 'menu-item' + (isGlobalActive ? ' active' : '');
     globalItem.innerHTML =
       '<div class="menu-item-main">' +
-        '<span class="menu-item-icon">🌐</span>' +
-        '<span class="menu-item-text">' +
-          '<strong>GLOBAL</strong>' +
-          '<small>' + globalTotal + ' elementos</small>' +
-        '</span>' +
+      '<span class="menu-item-icon">🌐</span>' +
+      '<span class="menu-item-text">' +
+      '<strong>GLOBAL</strong>' +
+      '<small>' + globalTotal + ' elementos</small>' +
+      '</span>' +
       '</div>' +
       '<span class="menu-item-badge">' + globalTotal + '</span>';
     globalItem.onclick = function () {
@@ -473,11 +473,11 @@ const RenderManager = (() => {
       div.className = 'menu-item' + (isActive ? ' active' : '');
       div.innerHTML =
         '<div class="menu-item-main">' +
-          '<span class="menu-item-icon">' + icon + '</span>' +
-          '<span class="menu-item-text">' +
-            '<strong>' + tag + '</strong>' +
-            '<small>' + countLabel + '</small>' +
-          '</span>' +
+        '<span class="menu-item-icon">' + icon + '</span>' +
+        '<span class="menu-item-text">' +
+        '<strong>' + tag + '</strong>' +
+        '<small>' + countLabel + '</small>' +
+        '</span>' +
         '</div>' +
         '<span class="menu-item-badge">' + totalElementos + '</span>';
       div.onclick = function () {
@@ -510,12 +510,12 @@ const RenderManager = (() => {
 
       html +=
         '<div class="summary-card" style="cursor: pointer;" onclick="AppState.setCurrentTag(\'' + tag.replace(/'/g, "\\'") + '\');RenderManager.renderAll();">' +
-          '<h4 style="display: flex; align-items: center; gap: 8px;">' +
-            '<span>' + icon + '</span>' +
-            '<span>' + tag + '</span>' +
-          '</h4>' +
-          '<p><strong>' + totalElementos + '</strong> elementos</p>' +
-          '<p style="font-size: 11px; color: #666;"><strong>' + metroLinear.toFixed(2) + '</strong> m | <strong>' + area.toFixed(2) + '</strong> m²</p>' +
+        '<h4 style="display: flex; align-items: center; gap: 8px;">' +
+        '<span>' + icon + '</span>' +
+        '<span>' + tag + '</span>' +
+        '</h4>' +
+        '<p><strong>' + totalElementos + '</strong> elementos</p>' +
+        '<p style="font-size: 11px; color: #666;"><strong>' + metroLinear.toFixed(2) + '</strong> m | <strong>' + area.toFixed(2) + '</strong> m²</p>' +
         '</div>';
     });
 

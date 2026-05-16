@@ -15,7 +15,10 @@ module RelatorioPRO
 		end
 
 		def run_extract_ifc
-			run_python_script("extract_ifc.py")
+			ifc_path = preferred_ifc_path
+			return missing_ifc_result if ifc_path.nil?
+
+			run_python_script("extract_ifc.py", [ifc_path])
 		end
 
 		def run_grouping
@@ -51,9 +54,32 @@ module RelatorioPRO
 			File.join(logs_dir, "pipeline.log")
 		end
 
-		def run_python_script(script_name)
+		def preferred_ifc_path
+			env_ifc = ENV["RELATORIOPRO_IFC_PATH"]
+			return nil if env_ifc.to_s.strip.empty?
+			return nil unless File.exist?(env_ifc)
+
+			env_ifc
+		end
+
+		def missing_ifc_result
+			message = "RELATORIOPRO_IFC_PATH nao definido ou arquivo inexistente. Fluxo IFC exige caminho explicito."
+			result = {
+				success: false,
+				stdout: "",
+				stderr: message,
+				exit_status: 1,
+				script: "extract_ifc.py",
+				command: "(skipped)"
+			}
+
+			append_pipeline_log(result)
+			result
+		end
+
+		def run_python_script(script_name, script_args = [])
 			script = File.join(project_root, "python", script_name)
-			command = [python_executable, script]
+			command = [python_executable, script] + Array(script_args)
 			stdout, stderr, status = Open3.capture3(*command, chdir: project_root)
 
 			puts stdout unless stdout.to_s.empty?
