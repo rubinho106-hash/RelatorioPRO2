@@ -52,6 +52,7 @@ let simpleTagModelLastSignature = '';  // Cache signature para buildSimpleTagMod
 let dashboardModeEventsBound = false;
 let outboundSelectionKey = '';
 let outboundSelectionLockUntil = 0;
+let outboundTagSelectionLockUntil = 0;
 let dashboardSelectionPulseTimer = null;
 let pendingSelectionClearTimer = null;
 const SELECTION_CLEAR_GRACE_MS = 220;
@@ -213,6 +214,15 @@ function _initializeEventDrivenArchitecture() {
 
   EventBus.on(EventBus.Events.TAG_SELECTED, function (data) {
     _syncStateProxies();
+
+    const selectedTag = String((data && data.tag) || (typeof AppState !== 'undefined' && AppState.getCurrentTag ? AppState.getCurrentTag() : '') || '').trim();
+    if (selectedTag && typeof Bridge !== 'undefined' && typeof Bridge.selectTagEntities === 'function') {
+      const zoomToggle = document.getElementById('zoomToggle');
+      const shouldFocus = !!(zoomToggle && zoomToggle.checked);
+      outboundTagSelectionLockUntil = Date.now() + 700;
+      Bridge.selectTagEntities(selectedTag, { focus: shouldFocus });
+    }
+
     if (typeof RenderManager !== 'undefined' && RenderManager.renderAll) {
       RenderManager.renderAll();
     }
@@ -288,6 +298,15 @@ function _initializeEventDrivenArchitecture() {
       if (pendingSelectionClearTimer) {
         clearTimeout(pendingSelectionClearTimer);
         pendingSelectionClearTimer = null;
+      }
+
+      if (ids.length > 1) {
+        // Bulk selection (usually from TAG sync) must preserve TAG workspace.
+        if (Date.now() < outboundTagSelectionLockUntil) {
+          return;
+        }
+        pulseDashboardSelection('sketchup');
+        return;
       }
 
       const firstId = String(ids[0] || '').trim();

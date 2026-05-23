@@ -208,6 +208,10 @@ module RelatorioPRO
 			Sketchup.active_model.selection.clear
 		end
 
+		dialog.add_action_callback("select_tag_entities") do |_ctx, tag_name, focus|
+			select_tag_entities(tag_name, focus: focus)
+		end
+
 		dialog.add_action_callback("zoomSelection") do |_ctx|
 			selection_entities = Sketchup.active_model.selection.to_a
 			focus_camera_on_entities(selection_entities, smooth: true)
@@ -253,6 +257,61 @@ module RelatorioPRO
 		end
 
 		found
+	end
+
+	def select_tag_entities(tag_name, focus: false)
+		model = Sketchup.active_model
+		return { success: false, count: 0, error: "no_model" } unless model
+
+		tag_label = tag_name.to_s.strip
+		return { success: false, count: 0, error: "empty_tag" } if tag_label.empty?
+
+		layer = find_layer_by_name(model, tag_label)
+		if layer && model.respond_to?(:layers) && model.layers.respond_to?(:current=)
+			model.layers.current = layer
+		end
+
+		entities = collect_entities_by_tag(model, tag_label)
+
+		selection = model.selection
+		selection.clear
+		entities.each { |entity| selection.add(entity) }
+
+		if focus && !entities.empty?
+			focus_camera_on_entities(entities, smooth: true)
+		end
+
+		{ success: true, count: entities.length, tag: tag_label }
+	rescue StandardError => e
+		puts("[RelatorioPRO] select_tag_entities error: #{e.class}: #{e.message}")
+		{ success: false, count: 0, error: e.message }
+	end
+
+	def find_layer_by_name(model, wanted_name)
+		target = wanted_name.to_s.strip
+		return nil if target.empty?
+
+		model.layers.each do |layer|
+			next unless layer
+			return layer if layer.name.to_s.casecmp(target).zero?
+		end
+
+		nil
+	rescue StandardError
+		nil
+	end
+
+	def collect_entities_by_tag(model, tag_name)
+		target = tag_name.to_s.strip.upcase
+		return [] if target.empty?
+
+		instances = []
+		collect_instances_recursive(model.entities, instances)
+
+		instances.select do |entity|
+			next false unless entity.respond_to?(:layer) && entity.layer
+			entity.layer.name.to_s.upcase == target
+		end
 	end
 
 	def focus_camera_on_entities(entities, smooth: true)
