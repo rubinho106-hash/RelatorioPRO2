@@ -156,7 +156,11 @@ const AppState = (() => {
     setCurrentElement(elementKey) {
       state.navigation.currentElement = elementKey;
       if (elementKey) {
-        state.navigation.mode = 'ELEMENT';
+        state.navigation.mode = state.navigation.currentTag ? 'TAG' : 'ELEMENT';
+      } else if (state.navigation.currentTag) {
+        state.navigation.mode = 'TAG';
+      } else if (state.navigation.mode === 'ELEMENT') {
+        state.navigation.mode = 'GLOBAL';
       }
       this._updateBreadcrumb();
     },
@@ -247,7 +251,7 @@ const AppState = (() => {
       if (tag) {
         state.navigation.currentTag = tag;
       }
-      state.navigation.mode = 'ELEMENT';
+      state.navigation.mode = state.navigation.currentTag ? 'TAG' : 'ELEMENT';
       this._updateBreadcrumb();
     },
 

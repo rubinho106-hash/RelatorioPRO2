@@ -53,6 +53,8 @@ let dashboardModeEventsBound = false;
 let outboundSelectionKey = '';
 let outboundSelectionLockUntil = 0;
 let dashboardSelectionPulseTimer = null;
+let pendingSelectionClearTimer = null;
+const SELECTION_CLEAR_GRACE_MS = 220;
 const DEFAULT_TAG_IFC_RULES = {
   VIGA: ['IFCBEAM'],
   PILAR: ['IFCCOLUMN'],
@@ -256,11 +258,36 @@ function _initializeEventDrivenArchitecture() {
       const ids = Array.isArray(detail.ids) ? detail.ids : [];
 
       if (ids.length === 0) {
-        AppState.setCurrentElement(null);
-        if (typeof RenderManager !== 'undefined' && RenderManager.renderAll) {
-          RenderManager.renderAll();
+        // SketchUp may emit a transient empty selection right after a valid pick.
+        // Delay clear to keep element details visible and avoid destructive UI bounce.
+        if (pendingSelectionClearTimer) {
+          clearTimeout(pendingSelectionClearTimer);
+          pendingSelectionClearTimer = null;
         }
+
+        pendingSelectionClearTimer = setTimeout(function () {
+          pendingSelectionClearTimer = null;
+
+          if (Date.now() < outboundSelectionLockUntil) {
+            return;
+          }
+
+          const current = String((typeof AppState !== 'undefined' && AppState.getCurrentElement) ? (AppState.getCurrentElement() || '') : '').trim();
+          if (!current) {
+            return;
+          }
+
+          AppState.setCurrentElement(null);
+          if (typeof RenderManager !== 'undefined' && RenderManager.renderAll) {
+            RenderManager.renderAll();
+          }
+        }, SELECTION_CLEAR_GRACE_MS);
         return;
+      }
+
+      if (pendingSelectionClearTimer) {
+        clearTimeout(pendingSelectionClearTimer);
+        pendingSelectionClearTimer = null;
       }
 
       const firstId = String(ids[0] || '').trim();
@@ -317,9 +344,120 @@ function getColumnDisplayLabel(key) {
   return k;
 }
 
+function captureDashboardUIState() {
+  'use strict';
+  const state = (typeof AppState !== 'undefined' && AppState.getState) ? AppState.getState() : null;
+  const searchInput = document.getElementById('dashboardSearchInput');
+  const storeySelect = document.getElementById('filtroPavimento');
+  const tableWrapper = document.getElementById('tabelaWrapper');
+  const menu = document.getElementById('menu');
+  const highlightedCellId = currentHighlightedCell ? String(currentHighlightedCell.id || '') : '';
+  const highlightedCellClass = currentHighlightedCell && currentHighlightedCell.classList.contains('edit-highlight')
+    ? 'edit-highlight'
+    : (currentHighlightedCell && currentHighlightedCell.classList.contains('highlight') ? 'highlight' : '');
+
+  return {
+    currentTag: state && state.navigation ? state.navigation.currentTag : null,
+    currentElement: state && state.navigation ? state.navigation.currentElement : null,
+    search: state && state.filters ? state.filters.search : (searchInput ? searchInput.value : ''),
+    storey: state && state.filters ? state.filters.storey : (storeySelect ? storeySelect.value : ''),
+    tableScrollTop: tableWrapper ? tableWrapper.scrollTop : 0,
+    menuScrollTop: menu ? menu.scrollTop : 0,
+    highlightedCellId: highlightedCellId,
+    highlightedCellClass: highlightedCellClass
+  };
+}
+
+function restoreDashboardUIState(snapshot) {
+  'use strict';
+  if (!snapshot || typeof AppState === 'undefined') { return false; }
+
+  const targetTag = snapshot.currentTag && window.tagModel && window.tagModel[snapshot.currentTag]
+    ? snapshot.currentTag
+    : null;
+  const targetElement = snapshot.currentElement ? String(snapshot.currentElement) : '';
+  const searchValue = String(snapshot.search || '');
+  const requestedStorey = String(snapshot.storey || '');
+  const searchInput = document.getElementById('dashboardSearchInput');
+  const storeySelect = document.getElementById('filtroPavimento');
+  const tableWrapper = document.getElementById('tabelaWrapper');
+  const menu = document.getElementById('menu');
+
+  if (targetTag) {
+    AppState.setCurrentTag(targetTag);
+    carregarPavimentos(targetTag);
+  } else {
+    AppState.backToGlobal();
+  }
+
+  if (requestedStorey) {
+    AppState.setStoreyFilter(requestedStorey);
+    if (storeySelect && Array.from(storeySelect.options).some(function (option) { return option.value === requestedStorey; })) {
+      storeySelect.value = requestedStorey;
+    } else if (storeySelect) {
+      storeySelect.value = '';
+      AppState.setStoreyFilter('');
+    }
+  } else if (storeySelect) {
+    storeySelect.value = '';
+    AppState.setStoreyFilter('');
+  }
+
+  AppState.setSearchTerm(searchValue);
+  if (searchInput) { searchInput.value = searchValue; }
+
+  if (targetElement) {
+    AppState.setCurrentElement(targetElement);
+  }
+
+  _syncStateProxies();
+
+  if (typeof RenderManager !== 'undefined') {
+    RenderManager.renderAll();
+  } else {
+    renderDashboard();
+  }
+
+  window.requestAnimationFrame(function () {
+    if (tableWrapper) { tableWrapper.scrollTop = Number(snapshot.tableScrollTop || 0); }
+    if (menu) { menu.scrollTop = Number(snapshot.menuScrollTop || 0); }
+
+    const tabela = document.getElementById('tabela');
+    const hasRenderedList = tabela && tabela.querySelector('tbody tr');
+    if (!hasRenderedList && targetTag && window.tagModel && window.tagModel[targetTag] && typeof renderTabela === 'function') {
+      const grupo = window.tagModel[targetTag];
+      const state = AppState.getState();
+      const elementosBase = resolveTagElementsForRender(targetTag, grupo);
+      let elementosFiltrados = !state.filters.storey ? elementosBase : elementosBase.filter(function (e) {
+        return String((e && (e.storey || e.pavimento)) || '') === state.filters.storey;
+      });
+      if (elementosFiltrados.length === 0 && elementosBase.length > 0) {
+        elementosFiltrados = elementosBase;
+      }
+      renderTabela(elementosFiltrados);
+    }
+
+    if (currentHighlightedCell) {
+      currentHighlightedCell.classList.remove('highlight', 'edit-highlight');
+      currentHighlightedCell = null;
+    }
+
+    if (snapshot.highlightedCellId) {
+      const restoredCell = document.getElementById(snapshot.highlightedCellId);
+      if (restoredCell) {
+        restoredCell.classList.add(snapshot.highlightedCellClass === 'edit-highlight' ? 'edit-highlight' : 'highlight');
+        currentHighlightedCell = restoredCell;
+      }
+    }
+  });
+
+  return !!(targetTag || targetElement || searchValue || requestedStorey || snapshot.highlightedCellId);
+}
+
 // UPDATE DATA — chamado pelo Ruby via execute_script
 function updateData(data, saved_settings, layer_list, dynamic_list, custom_keys, ifc_summary) {
   customLog('(*) DATA REFRESHED');
+  const preservedUiState = captureDashboardUIState();
   objects = data;
   groupedStructuralMode = Array.isArray(data) && data.length > 0 && data[0] && data[0].is_group === true;
   window.relatorioGroupedMode = groupedStructuralMode;
@@ -615,9 +753,10 @@ function updateData(data, saved_settings, layer_list, dynamic_list, custom_keys,
 
   // ✅ Renderizar dashboard APÓS tabela legado (evita container.innerHTML = '' destruir #resumo)
   // #dashboardContainer é separado de #tableContainer — sem conflito
-  if (needsDashboardRebuild) {
-    bindDashboardModeEvents();
-    renderMenu();
+  bindDashboardModeEvents();
+  renderMenu();
+
+  if (!restoreDashboardUIState(preservedUiState)) {
     renderFirst();
   }
 }
@@ -2885,11 +3024,15 @@ function selectElementByKey(key, focusInModel) {
   if (focusInModel) {
     outboundSelectionKey = wanted;
     outboundSelectionLockUntil = Date.now() + 500;
+    const zoomToggle = document.getElementById('zoomToggle');
+    const shouldAutoZoom = !!(zoomToggle && zoomToggle.checked);
 
     // ✅ NOVO: Usar Bridge em vez de chamar focusEntity diretamente
     if (typeof Bridge !== 'undefined' && Bridge.highlightEntity) {
       Bridge.highlightEntity(wanted);
-      Bridge.zoomSelection();
+      if (shouldAutoZoom && typeof Bridge.zoomSelection === 'function') {
+        Bridge.zoomSelection();
+      }
     } else {
       focusEntity(wanted);
     }
@@ -3284,27 +3427,33 @@ function renderTabela(elements) {
   'use strict';
   const tabela = document.getElementById('tabela');
   const tabelaWrapper = document.getElementById('tabelaWrapper');
+  const state = (typeof AppState !== 'undefined' && AppState.getState) ? AppState.getState() : null;
+  const mode = state && state.navigation && state.navigation.mode
+    ? String(state.navigation.mode || '').toLowerCase()
+    : getDashboardMode();
+  const activeTag = state && state.navigation ? String(state.navigation.currentTag || '') : String(currentTag || '');
+  const searchTerm = state && state.filters ? String(state.filters.search || '') : String(dashboardSearchTerm || '');
   if (!tabela) { return; }
 
   // Em modo ELEMENTO, não renderizar tabela (apenas KPIs são mostrados)
-  if (getDashboardMode() === 'element') {
+  if (mode === 'element') {
     if (tabelaWrapper) { setDashboardPanelVisible(tabelaWrapper, false); }
     return;
   }
 
   if (tabelaWrapper) { setDashboardPanelVisible(tabelaWrapper, true); }
   const list = Array.isArray(elements) ? elements : [];
-  let filteredElements = applyQueryEngineFilter(list, dashboardSearchTerm);
+  let filteredElements = applyQueryEngineFilter(list, searchTerm);
 
   // Evita tela "vazia" em TAG por busca residual do contexto anterior.
-  if (getDashboardMode() === 'tag' && filteredElements.length === 0 && list.length > 0) {
+  if (mode === 'tag' && filteredElements.length === 0 && list.length > 0) {
     filteredElements = list;
   }
 
   let metricKey = 'volume';
   let metricLabel = 'Volume (m³)';
-  if (currentTag && window.tagModel && window.tagModel[currentTag]) {
-    const g = window.tagModel[currentTag] || {};
+  if (activeTag && window.tagModel && window.tagModel[activeTag]) {
+    const g = window.tagModel[activeTag] || {};
     if (Number(g.volume || 0) <= 0 && Number(g.area || 0) > 0) {
       metricKey = 'area';
       metricLabel = 'Area (m²)';
@@ -3314,11 +3463,11 @@ function renderTabela(elements) {
     }
   }
 
-  const sectionTitle = currentTag ? currentTag : 'GLOBAL';
+  const sectionTitle = activeTag ? activeTag : 'GLOBAL';
   const totalInstances = list.reduce(function (sum, e) {
     return sum + Math.max(1, Math.round(parseLocalizedNumberDisplay(e.quantidade || e.quantity || 1)));
   }, 0);
-  const countLabel = getDashboardMode() === 'tag' && filteredElements.length > 0 && filteredElements.length !== totalInstances
+  const countLabel = mode === 'tag' && filteredElements.length > 0 && filteredElements.length !== totalInstances
     ? filteredElements.length + ' grupos • ' + totalInstances + ' instâncias'
     : filteredElements.length + ' elementos';
   let html = '<thead><tr><th>' + sectionTitle + ' <span style="opacity:.75;font-weight:600;">' + countLabel + '</span></th><th style="text-align:right;">' + metricLabel + '</th></tr></thead><tbody>';
@@ -3331,12 +3480,19 @@ function renderTabela(elements) {
   filteredElements.forEach(function (e) {
     const rowKey = getElementKey(e);
     const safeKey = escapeForSingleQuote(rowKey);
+    const currentSelected = (typeof AppState !== 'undefined' && AppState.getCurrentElement)
+      ? String(AppState.getCurrentElement() || '').trim()
+      : '';
+    const isSelected = currentSelected && rowKey && String(rowKey) === currentSelected;
     const rawMetric = metricKey === 'area' ? (e.area || e.area_total || 0) : (metricKey === 'comprimento' ? (e.comprimento || e.metro_linear_total || 0) : (e.volume || e.volume_total || 0));
     const metricValue = Number(parseLocalizedNumberDisplay(rawMetric || 0));
     const rowQty = Math.max(1, Math.round(parseLocalizedNumberDisplay(e.quantidade || e.quantity || 1)));
     const rowQtyLabel = rowQty > 1 ? rowQty + ' inst.' : '1 inst.';
     const rowSub = e.ifc ? String(e.ifc) : String((e.storey || e.pavimento) || '-');
-    html += '<tr onclick="selectElementByKey(\'' + safeKey + '\', true)" style="cursor: pointer;">' +
+    const selectedStyle = isSelected
+      ? 'background: rgba(14,116,144,.18); box-shadow: inset 0 0 0 1px rgba(56,189,248,.60);'
+      : '';
+    html += '<tr onclick="selectElementByKey(\'' + safeKey + '\', true)" style="cursor: pointer;' + selectedStyle + '">' +
       '<td><div style="font-weight:700;">' + (e.instance || e.nome || 'Elemento') + '</div><div style="font-size:11px;opacity:.72;">' + rowSub + ' • ' + rowQtyLabel + '</div></td>' +
       '<td style="text-align:right;font-weight:700;">' + metricValue.toFixed(2).replace('.', ',') + '</td>' +
       '</tr>';
@@ -3445,7 +3601,7 @@ function renderResumoEtiquetas() {
   setDashboardPanelVisible(resumo, true);
 }
 
-function renderGlobalModeDetails() {
+function _legacyRenderGlobalModeDetails() {
   'use strict';
   const globalSummary = document.getElementById('globalSummary');
   const kpis = document.getElementById('kpis');
@@ -3491,7 +3647,7 @@ function renderGlobalModeDetails() {
   renderTabela(rows);
 }
 
-function renderElementModeDetails(selectedKey) {
+function _legacyRenderElementModeDetails(selectedKey) {
   'use strict';
   const globalSummary = document.getElementById('globalSummary');
   const kpis = document.getElementById('kpis');
@@ -3531,6 +3687,31 @@ function renderElementModeDetails(selectedKey) {
   }
 
   renderTabela([e]);
+}
+
+function renderGlobalModeDetails() {
+  'use strict';
+  if (typeof RenderManager !== 'undefined' && RenderManager.renderAll) {
+    AppState.backToGlobal();
+    RenderManager.renderAll();
+    return;
+  }
+
+  _legacyRenderGlobalModeDetails();
+}
+
+function renderElementModeDetails(selectedKey) {
+  'use strict';
+  if (typeof RenderManager !== 'undefined' && RenderManager.renderAll) {
+    const wanted = String(selectedKey || '').trim();
+    if (wanted) {
+      AppState.setCurrentElement(wanted);
+    }
+    RenderManager.renderAll();
+    return;
+  }
+
+  _legacyRenderElementModeDetails(selectedKey);
 }
 
 function updateDashboardModeUI() {
@@ -3590,18 +3771,27 @@ function bindDashboardModeEvents() {
 
   if (btnTag) {
     btnTag.addEventListener('click', function () {
-      if (!currentTag && window.tagModel) {
+      let activeTag = (typeof AppState !== 'undefined' && AppState.getCurrentTag)
+        ? AppState.getCurrentTag()
+        : null;
+
+      if (!activeTag && window.tagModel) {
         const sortedTags = Object.keys(window.tagModel).sort();
-        currentTag = sortedTags.length > 0 ? sortedTags[0] : null;
+        activeTag = sortedTags.length > 0 ? sortedTags[0] : null;
       }
-      if (currentTag) {
-        currentElement = null;
-        currentMode = 'tag';
-        carregarPavimentos(currentTag);
+
+      if (activeTag) {
+        AppState.setCurrentTag(activeTag);
+        AppState.setCurrentElement(null);
+        carregarPavimentos(activeTag);
+        EventBus.emit(EventBus.Events.TAG_SELECTED, { tag: activeTag });
       }
-      updateDashboardModeUI();
-      renderMenu();
-      renderDashboard();
+
+      if (typeof RenderManager === 'undefined') {
+        updateDashboardModeUI();
+        renderMenu();
+        renderDashboard();
+      }
     });
   }
 
@@ -3622,6 +3812,11 @@ function bindDashboardModeEvents() {
 
 function renderDashboard() {
   'use strict';
+  if (typeof RenderManager !== 'undefined' && RenderManager.renderAll) {
+    RenderManager.renderAll();
+    return;
+  }
+
   const mode = getDashboardMode();
   updateDashboardModeUI();
 
@@ -3696,7 +3891,7 @@ function selectTag(tag, element) {
   }
 }
 
-function renderTag(tag) {
+function _legacyRenderTag(tag) {
   'use strict';
   if (!window.tagModel || !window.tagModel[tag]) { return; }
 
@@ -3753,6 +3948,22 @@ function renderTag(tag) {
   }
 
   renderTabela(elementosFiltrados);
+}
+
+function renderTag(tag) {
+  'use strict';
+  if (typeof RenderManager !== 'undefined' && RenderManager.renderAll) {
+    const wantedTag = String(tag || '').trim();
+    if (wantedTag && window.tagModel && window.tagModel[wantedTag]) {
+      AppState.setCurrentTag(wantedTag);
+      AppState.setCurrentElement(null);
+      carregarPavimentos(wantedTag);
+    }
+    RenderManager.renderAll();
+    return;
+  }
+
+  _legacyRenderTag(tag);
 }
 
 function focusEntity(id) {

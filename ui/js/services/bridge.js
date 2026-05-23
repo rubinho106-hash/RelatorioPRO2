@@ -135,6 +135,19 @@ const Bridge = (() => {
     },
 
     /**
+     * Select all model entities that belong to a TAG/LAYER
+     * @param {string} tagName - TAG name
+     * @param {object} options - { focus: boolean }
+     */
+    selectTagEntities(tagName, options = {}) {
+      const name = String(tagName || '').trim();
+      if (!name) return;
+
+      const focus = !!(options && options.focus);
+      _safeCall('select_tag_entities', [name, focus]);
+    },
+
+    /**
      * Request data refresh from Ruby backend
      */
     requestDataRefresh() {

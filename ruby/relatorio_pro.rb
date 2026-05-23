@@ -10,6 +10,8 @@ module RelatorioPRO
 	INCH2_TO_M2 = 0.000_645_16
 	INCH3_TO_M3 = 0.000_016_387_064
 	LIVE_REFRESH_DEBOUNCE_SECONDS = 0.35
+	CAMERA_FOCUS_DURATION_SECONDS = 0.20
+	CAMERA_FOCUS_STEPS = 8
 	DYNAMIC_SKIP_DICT_PREFIXES = ["SU_"].freeze
 	DYNAMIC_SKIP_KEYS = %w[_formatversion _inst__x _inst__y _inst__z _lenx_formula _leny_formula _lenz_formula].freeze
 	MODEL_DEFAULT_SETTINGS = {
@@ -207,12 +209,13 @@ module RelatorioPRO
 		end
 
 		dialog.add_action_callback("zoomSelection") do |_ctx|
-			Sketchup.active_model.active_view.zoom(Sketchup.active_model.selection)
+			selection_entities = Sketchup.active_model.selection.to_a
+			focus_camera_on_entities(selection_entities, smooth: true)
 		end
 
 		dialog.add_action_callback("focus_entity") do |_ctx, pid|
 			entities = select_entities([pid])
-			Sketchup.active_model.active_view.zoom(entities) unless entities.empty?
+			focus_camera_on_entities(entities, smooth: true) unless entities.empty?
 		end
 
 		dialog.add_action_callback("zoom_entity") do |_ctx, pid|
@@ -250,6 +253,97 @@ module RelatorioPRO
 		end
 
 		found
+	end
+
+	def focus_camera_on_entities(entities, smooth: true)
+		model = Sketchup.active_model
+		return false unless model
+
+		view = model.active_view
+		return false unless view
+
+		list = Array(entities).compact.select { |entity| entity.respond_to?(:valid?) && entity.valid? }
+		return false if list.empty?
+
+		target = combined_entities_center(list)
+		return false unless target
+
+		camera = view.camera
+		distance = camera.eye.distance(camera.target)
+		return false unless distance.is_a?(Numeric) && distance.finite? && distance > 0.001
+
+		direction = camera.direction
+		new_eye = target.offset(direction.reverse, distance)
+
+		if smooth
+			animate_camera_transition(
+				view,
+				camera.eye,
+				new_eye,
+				camera.target,
+				target,
+				camera.up,
+				CAMERA_FOCUS_DURATION_SECONDS,
+				CAMERA_FOCUS_STEPS
+			)
+		else
+			camera.set(new_eye, target, camera.up)
+			view.camera = camera
+			view.invalidate
+		end
+
+		true
+	rescue StandardError => e
+		puts("[RelatorioPRO] focus_camera_on_entities error: #{e.class}: #{e.message}")
+		false
+	end
+
+	def combined_entities_center(entities)
+		bounds = Geom::BoundingBox.new
+		Array(entities).each do |entity|
+			next unless entity.respond_to?(:bounds)
+			bounds.add(entity.bounds)
+		end
+
+		return nil if bounds.empty?
+
+		bounds.center
+	rescue StandardError
+		nil
+	end
+
+	def animate_camera_transition(view, from_eye, to_eye, from_target, to_target, up, duration_seconds, steps)
+		frame_count = [[steps.to_i, 1].max, 60].min
+		interval = [duration_seconds.to_f / frame_count, 0.01].max
+		frame = 0
+		timer_id = nil
+
+		timer_id = UI.start_timer(interval, true) do
+			frame += 1
+			t = [frame.to_f / frame_count, 1.0].min
+
+			eye = lerp_point3d(from_eye, to_eye, t)
+			target = lerp_point3d(from_target, to_target, t)
+
+			camera = view.camera
+			camera.set(eye, target, up)
+			view.camera = camera
+			view.invalidate
+
+			if frame >= frame_count
+				UI.stop_timer(timer_id) if timer_id
+			end
+		end
+	rescue StandardError => e
+		puts("[RelatorioPRO] animate_camera_transition error: #{e.class}: #{e.message}")
+	end
+
+	def lerp_point3d(from_point, to_point, t)
+		Geom::Point3d.new(
+			from_point.x + ((to_point.x - from_point.x) * t),
+			from_point.y + ((to_point.y - from_point.y) * t),
+			from_point.z + ((to_point.z - from_point.z) * t)
+		)
 	end
 
 	def attach_selection_observer
@@ -526,15 +620,41 @@ module RelatorioPRO
 		true
 	end
 
-	def collect_instances_recursive(entities, output)
+	def collect_instances_recursive(entities, output, visited = nil)
+		# Regra de contagem BIM:
+		# - Conta ComponentInstance e Group como entidades válidas.
+		# - Se Group for container (tem filhos Group/ComponentInstance), não conta o pai.
+		# - Expande apenas 1 nível dentro desse Group.
+		# - Nunca recursiona profundamente nem conta faces/arestas.
+		visited ||= Set.new
+		return unless entities
+
 		entities.each do |entity|
 			next unless entity.valid?
 			next unless entity.is_a?(Sketchup::ComponentInstance) || entity.is_a?(Sketchup::Group)
 
-			output << entity
-			next unless entity.respond_to?(:definition) && entity.definition
+			pid = entity.persistent_id
+			next if visited.include?(pid)
 
-			collect_instances_recursive(entity.definition.entities, output)
+			if entity.is_a?(Sketchup::Group)
+				child_instances = entity.entities.grep(Sketchup::ComponentInstance)
+				child_groups = entity.entities.grep(Sketchup::Group)
+				children = (child_instances + child_groups).select(&:valid?)
+
+				if !children.empty?
+					visited << pid
+					children.each do |child|
+						child_pid = child.persistent_id
+						next if visited.include?(child_pid)
+						visited << child_pid
+						output << child
+					end
+					next
+				end
+			end
+
+			visited << pid
+			output << entity
 		end
 	end
 

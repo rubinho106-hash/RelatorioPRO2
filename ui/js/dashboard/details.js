@@ -28,17 +28,17 @@ const DetailsModule = (() => {
     if (value === null || value === undefined || value === '') {
       return '—';
     }
-    
+
     const num = parseFloat(value);
     if (isNaN(num)) {
       return String(value);
     }
-    
+
     const formatted = num.toLocaleString('pt-BR', {
       minimumFractionDigits: precision,
       maximumFractionDigits: precision
     });
-    
+
     return unit ? `${formatted} ${unit}` : formatted;
   };
 
@@ -50,7 +50,7 @@ const DetailsModule = (() => {
     if (!Array.isArray(tagElements)) {
       return null;
     }
-    
+
     return tagElements.find(el => _getElementKey(el) === key);
   };
 
@@ -68,10 +68,10 @@ const DetailsModule = (() => {
    */
   const _getAllTagElements = (tag, state) => {
     if (!tag) return [];
-    
+
     const tagData = state.data.tags.find(t => t.tag === tag);
     if (!tagData) return [];
-    
+
     // Try multiple sources for element array
     return tagData.elementos || tagData.elements || tagData.rows || [];
   };
@@ -82,7 +82,7 @@ const DetailsModule = (() => {
    */
   const _escapeHtml = (text) => {
     if (!text) return '';
-    
+
     const map = {
       '&': '&amp;',
       '<': '&lt;',
@@ -90,7 +90,7 @@ const DetailsModule = (() => {
       '"': '&quot;',
       "'": '&#039;'
     };
-    
+
     return String(text).replace(/[&<>"']/g, m => map[m]);
   };
 
@@ -116,7 +116,7 @@ const DetailsModule = (() => {
         </div>
       </div>
     `;
-    
+
     return html;
   };
 
@@ -126,7 +126,7 @@ const DetailsModule = (() => {
    */
   const _buildMetricsSection = (element) => {
     const metrics = [];
-    
+
     // Linear metric (metro linear)
     if (element.metroLinear !== null && element.metroLinear !== undefined) {
       metrics.push({
@@ -135,7 +135,7 @@ const DetailsModule = (() => {
         icon: '📏'
       });
     }
-    
+
     // Area
     if (element.area !== null && element.area !== undefined && element.area > 0) {
       metrics.push({
@@ -144,7 +144,7 @@ const DetailsModule = (() => {
         icon: '📐'
       });
     }
-    
+
     // Volume
     if (element.volume !== null && element.volume !== undefined && element.volume > 0) {
       metrics.push({
@@ -153,7 +153,7 @@ const DetailsModule = (() => {
         icon: '📦'
       });
     }
-    
+
     // Thickness (espessura)
     if (element.espessura !== null && element.espessura !== undefined) {
       metrics.push({
@@ -162,7 +162,7 @@ const DetailsModule = (() => {
         icon: '⏱️'
       });
     }
-    
+
     // Weight (peso)
     if (element.peso !== null && element.peso !== undefined && element.peso > 0) {
       metrics.push({
@@ -171,11 +171,11 @@ const DetailsModule = (() => {
         icon: '⚖️'
       });
     }
-    
+
     if (metrics.length === 0) {
       return '';
     }
-    
+
     const metricsHtml = metrics
       .map(m => `
         <div class="details-field">
@@ -184,7 +184,7 @@ const DetailsModule = (() => {
         </div>
       `)
       .join('');
-    
+
     return `
       <div class="details-section">
         <h4 class="details-section-title">Métricas</h4>
@@ -199,7 +199,7 @@ const DetailsModule = (() => {
    */
   const _buildPropertiesSection = (element) => {
     const properties = [];
-    
+
     // Cost
     if (element.custo !== null && element.custo !== undefined && element.custo > 0) {
       properties.push({
@@ -208,7 +208,7 @@ const DetailsModule = (() => {
         icon: '💰'
       });
     }
-    
+
     // Material
     if (element.material) {
       properties.push({
@@ -217,7 +217,7 @@ const DetailsModule = (() => {
         icon: '🏗️'
       });
     }
-    
+
     // EPS (environmental impact)
     if (element.EPS || element.eps) {
       properties.push({
@@ -226,7 +226,7 @@ const DetailsModule = (() => {
         icon: '🌱'
       });
     }
-    
+
     // Category
     if (element.categoria) {
       properties.push({
@@ -235,7 +235,7 @@ const DetailsModule = (() => {
         icon: '🏷️'
       });
     }
-    
+
     // Status
     if (element.status) {
       properties.push({
@@ -244,11 +244,11 @@ const DetailsModule = (() => {
         icon: '📍'
       });
     }
-    
+
     if (properties.length === 0) {
       return '';
     }
-    
+
     const propertiesHtml = properties
       .map(p => `
         <div class="details-field">
@@ -257,7 +257,7 @@ const DetailsModule = (() => {
         </div>
       `)
       .join('');
-    
+
     return `
       <div class="details-section">
         <h4 class="details-section-title">Propriedades</h4>
@@ -272,7 +272,7 @@ const DetailsModule = (() => {
    */
   const _buildIFCSection = (element) => {
     const ifcFields = [];
-    
+
     // IFC Type
     if (element.IFC || element.ifc) {
       ifcFields.push({
@@ -281,7 +281,7 @@ const DetailsModule = (() => {
         icon: '📋'
       });
     }
-    
+
     // IFC GUID
     if (element.IFC_GUID || element.ifcGuid || element.guid) {
       ifcFields.push({
@@ -291,7 +291,7 @@ const DetailsModule = (() => {
         monospace: true
       });
     }
-    
+
     // IFC Quality/Status
     if (element.ifcQuality || element.ifc_quality) {
       ifcFields.push({
@@ -300,11 +300,11 @@ const DetailsModule = (() => {
         icon: '✓'
       });
     }
-    
+
     if (ifcFields.length === 0) {
       return '';
     }
-    
+
     const ifcHtml = ifcFields
       .map(f => `
         <div class="details-field">
@@ -313,7 +313,7 @@ const DetailsModule = (() => {
         </div>
       `)
       .join('');
-    
+
     return `
       <div class="details-section">
         <h4 class="details-section-title">Informações IFC</h4>
@@ -328,7 +328,7 @@ const DetailsModule = (() => {
    */
   const _buildAttributesSection = (element) => {
     const customAttrs = [];
-    
+
     // Common attribute fields to skip
     const skipFields = [
       'id', 'key', 'name', 'tag', 'metroLinear', 'area', 'volume',
@@ -336,23 +336,23 @@ const DetailsModule = (() => {
       'categoria', 'status', 'IFC', 'ifc', 'ifcGuid', 'IFC_GUID',
       'guid', 'ifcQuality', 'ifc_quality', 'elementos', 'elements'
     ];
-    
+
     // Collect custom attributes
     for (const [key, value] of Object.entries(element)) {
       if (skipFields.includes(key)) continue;
       if (value === null || value === undefined) continue;
       if (typeof value === 'object' || typeof value === 'function') continue;
-      
+
       customAttrs.push({
         key: _escapeHtml(key),
         value: _escapeHtml(String(value))
       });
     }
-    
+
     if (customAttrs.length === 0) {
       return '';
     }
-    
+
     const attrsHtml = customAttrs
       .map(a => `
         <div class="details-field">
@@ -361,7 +361,7 @@ const DetailsModule = (() => {
         </div>
       `)
       .join('');
-    
+
     return `
       <div class="details-section">
         <h4 class="details-section-title">Atributos Customizados</h4>
@@ -406,7 +406,7 @@ const DetailsModule = (() => {
         </div>
       </div>
     `;
-    
+
     return html;
   };
 
@@ -417,23 +417,25 @@ const DetailsModule = (() => {
   const _handleActionClick = (event) => {
     const button = event.target.closest('button[data-action]');
     if (!button) return;
-    
+
     const action = button.dataset.action;
     const elementKey = button.dataset.element;
-    
+
     switch (action) {
       case 'highlight':
         if (typeof Bridge !== 'undefined' && Bridge.highlightEntity) {
           Bridge.highlightEntity(elementKey);
         }
         break;
-      
+
       case 'zoom':
-        if (typeof Bridge !== 'undefined' && Bridge.zoomSelection) {
+        if (typeof Bridge !== 'undefined' && Bridge.zoomEntity) {
+          Bridge.zoomEntity(elementKey);
+        } else if (typeof Bridge !== 'undefined' && Bridge.zoomSelection) {
           Bridge.zoomSelection();
         }
         break;
-      
+
       case 'select':
         if (typeof Bridge !== 'undefined' && Bridge.selectEntities) {
           Bridge.selectEntities([elementKey]);
@@ -454,18 +456,18 @@ const DetailsModule = (() => {
   const render = (container, state) => {
     if (!container) return;
     if (!state) return;
-    
+
     // Clear container
     container.innerHTML = '';
-    
+
     // Exit early if not in ELEMENT mode
     if (state.navigation.mode !== 'ELEMENT') {
       return;
     }
-    
+
     const currentElement = state.navigation.currentElement;
     const currentTag = state.navigation.currentTag;
-    
+
     if (!currentElement || !currentTag) {
       container.innerHTML = `
         <div class="details-empty">
@@ -474,11 +476,11 @@ const DetailsModule = (() => {
       `;
       return;
     }
-    
+
     // Find element in state data
     const tagElements = _getAllTagElements(currentTag, state);
     const element = _findElementByKey(currentElement, tagElements);
-    
+
     if (!element) {
       container.innerHTML = `
         <div class="details-empty">
@@ -487,7 +489,7 @@ const DetailsModule = (() => {
       `;
       return;
     }
-    
+
     // Build HTML sections
     const sections = [
       _buildIdentificationSection(element, currentTag),
@@ -497,7 +499,7 @@ const DetailsModule = (() => {
       _buildAttributesSection(element),
       _buildActionsSection(currentElement)
     ];
-    
+
     const html = `
       <div class="details-panel">
         <div class="details-header">
@@ -508,9 +510,9 @@ const DetailsModule = (() => {
         </div>
       </div>
     `;
-    
+
     container.innerHTML = html;
-    
+
     // Attach event listeners
     const buttons = container.querySelectorAll('button[data-action]');
     buttons.forEach(btn => {

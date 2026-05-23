@@ -92,7 +92,7 @@ const RenderManager = (() => {
     // Log de render
     const renderLog = {
       count: renderCount,
-      mode: state.currentElement ? 'element' : (state.currentTag ? 'tag' : 'global'),
+      mode: String(state.mode || '').toLowerCase() || (state.currentTag ? 'tag' : 'global'),
       tag: state.currentTag || null,
       timestamp: new Date().toISOString().substr(11, 8)
     };
@@ -125,10 +125,10 @@ const RenderManager = (() => {
       _renderBreadcrumb(state);
     }
 
-    // Renderizar conteúdo principal baseado no modo
-    if (state.currentElement) {
+    // Renderizar conteúdo principal baseado no modo (TAG é contexto principal).
+    if (state.mode === 'ELEMENT' && state.currentElement) {
       _renderElementMode(state);
-    } else if (state.currentTag) {
+    } else if (state.mode === 'TAG' || state.currentTag) {
       _renderTagMode(state);
     } else {
       _renderGlobalMode(state);
@@ -248,6 +248,41 @@ const RenderManager = (() => {
       renderTabela(elementosFiltrados);
     }
 
+    // Em modo TAG, elemento selecionado vira foco contextual (sem trocar layout).
+    const detailsContainer = document.getElementById('elementDetails');
+    if (detailsContainer) {
+      const selected = state.currentElement ? _findElementByKey(state.currentElement) : null;
+      if (selected) {
+        _setDashboardPanelVisible(detailsContainer, true);
+        const safeName = String(_getElementLabel(selected) || 'Elemento')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        const safeIfc = String(selected.ifc || '-')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        const safeStorey = String((selected.storey || selected.pavimento) || '-')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        const metricRaw = selected.volume || selected.volume_total || selected.area || selected.area_total || selected.comprimento || selected.metro_linear_total || 0;
+        const metric = Number(metricRaw || 0);
+
+        detailsContainer.innerHTML =
+          '<div class="summary-card" style="border-color: rgba(56,189,248,.6);">' +
+          '<h4>Elemento em Foco (TAG)</h4>' +
+          '<p>' + safeName + '</p>' +
+          '<span class="meta">IFC: ' + safeIfc + ' | Pavimento: ' + safeStorey + '</span>' +
+          '<div style="margin-top:8px;font-size:12px;color:#9fb3d1;">ID: ' + String(state.currentElement) + '</div>' +
+          '<div style="margin-top:6px;font-size:12px;color:#9fb3d1;">Métrica: ' + metric.toFixed(2).replace('.', ',') + '</div>' +
+          '</div>';
+      } else {
+        detailsContainer.innerHTML = '';
+        _setDashboardPanelVisible(detailsContainer, false);
+      }
+    }
+
     EventBus.emit('render:completed', { mode: 'tag', tag: state.currentTag });
   };
 
@@ -320,10 +355,12 @@ const RenderManager = (() => {
 
     if (indicator) {
       let modeText = 'GLOBAL';
-      if (state.currentElement) {
+      if (state.mode === 'ELEMENT' && state.currentElement) {
         modeText = 'ELEMENTO: ' + _getElementLabel(_findElementByKey(state.currentElement));
       } else if (state.currentTag) {
-        modeText = 'TAG: ' + state.currentTag;
+        modeText = state.currentElement
+          ? ('TAG: ' + state.currentTag + ' | Foco: ' + _getElementLabel(_findElementByKey(state.currentElement)))
+          : ('TAG: ' + state.currentTag);
       }
       indicator.textContent = modeText;
     }
