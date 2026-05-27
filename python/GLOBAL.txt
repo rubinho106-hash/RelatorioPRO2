@@ -1,0 +1,33 @@
+  GLOBAL
+
+
+
+  /
+
+
+
+  ARRANQUE PILARES
+
+
+
+  /
+
+
+
+  IfcColumn P56
+
+
+
+
+
+
+
+  IFC
+
+
+
+  24 elementos
+
+
+
+  m³

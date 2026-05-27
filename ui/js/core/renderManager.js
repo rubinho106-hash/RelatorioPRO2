@@ -1,3 +1,7 @@
+// Inicializa feature flags centralizadas
+if (!window.Runtime) window.Runtime = {};
+if (!window.Runtime.flags) window.Runtime.flags = { semanticInspector: true };
+
 // =============================================================================
 // RenderManager — Centralized Render Pipeline Orchestration
 // =============================================================================
@@ -75,7 +79,24 @@ const RenderManager = (() => {
     renderCount++;
     renderMetrics.totalRenders++;
 
+    // 1. Obter estados e runtime
     const state = _getCachedState();
+    const runtime = window.Runtime || {};
+    const schema = window.FIELD_GROUPS || null;
+    // Exemplo de métrica global (pode ser expandido)
+    const metrics = {
+      count: window.tagModel ? Object.values(window.tagModel).reduce((acc, t) => acc + Number(t.total_elementos || (t.elementos || []).length || 0), 0) : 0
+    };
+
+    // 2. Construir renderContext formal
+    let renderContext = null;
+    if (window.buildRenderContext) {
+      renderContext = window.buildRenderContext({ runtime, states: state, schema, metrics });
+    } else {
+      // Fallback mínimo
+      renderContext = { navigation: {}, selection: {}, schema, metrics };
+    }
+
     const currentTime = performance.now();
 
     // Detectar loops: 2+ renders em <50ms é suspeito
@@ -83,7 +104,7 @@ const RenderManager = (() => {
       console.warn('[RenderManager] ⚠️ RENDER LOOP DETECTED:', {
         renders: renderMetrics.renderHistory.slice(-3),
         interval: currentTime - lastRenderTime,
-        state: state.mode
+        state: renderContext?.workspace?.mode || state.mode
       });
     }
 
@@ -92,8 +113,8 @@ const RenderManager = (() => {
     // Log de render
     const renderLog = {
       count: renderCount,
-      mode: String(state.mode || '').toLowerCase() || (state.currentTag ? 'tag' : 'global'),
-      tag: state.currentTag || null,
+      mode: String(renderContext?.workspace?.mode || state.mode || '').toLowerCase(),
+      tag: renderContext?.workspace?.activeTag || state.currentTag || null,
       timestamp: new Date().toISOString().substr(11, 8)
     };
 
@@ -108,36 +129,48 @@ const RenderManager = (() => {
       customLog('[Render #' + renderCount + '] ' + renderLog.mode + (renderLog.tag ? ' (TAG: ' + renderLog.tag + ')' : ''));
     }
 
-    // ✅ PHASE 3: Use modular components
+    // 3. Atualizar UI de modo/layout
     _updateModeUI(state);
 
-    // Render sidebar (menu)
+    // 4. Render sidebar (menu)
     if (typeof SidebarModule !== 'undefined' && SidebarModule.render) {
       SidebarModule.render(state);
     } else {
       _renderMenu(state);
     }
 
-    // Render breadcrumb
-    if (typeof BreadcrumbModule !== 'undefined' && BreadcrumbModule.render) {
-      BreadcrumbModule.render(state);
+    // 5. Render semantic workspace header (PHASE 4: Orchestration → Presentation)
+    if (window.workspaceHeaderRenderer && window.buildWorkspaceHeaderViewModel) {
+      const viewModel = window.buildWorkspaceHeaderViewModel(renderContext);
+      const container = document.getElementById('dashboardBreadcrumb');
+      if (container) {
+        container.innerHTML = window.workspaceHeaderRenderer.renderWorkspaceHeader(viewModel);
+      }
     } else {
-      _renderBreadcrumb(state);
+      // Fallback: Render breadcrumb procedural
+      if (typeof BreadcrumbModule !== 'undefined' && BreadcrumbModule.render) {
+        BreadcrumbModule.render(state);
+      } else {
+        _renderBreadcrumb(state);
+      }
     }
 
-    // Renderizar conteúdo principal baseado no modo (TAG é contexto principal).
-    if (state.mode === 'ELEMENT' && state.currentElement) {
+    // 6. Renderizar conteúdo principal baseado no modo (TAG é contexto principal).
+    if (renderContext?.workspace?.mode === 'element' && renderContext?.workspace?.activeElement) {
       _renderElementMode(state);
-    } else if (state.mode === 'TAG' || state.currentTag) {
+    } else if (renderContext?.workspace?.mode === 'tag' || renderContext?.workspace?.activeTag) {
       _renderTagMode(state);
     } else {
       _renderGlobalMode(state);
     }
 
-    // Calcular duração do render
+    // 7. Calcular duração do render e registrar diagnóstico
     const endTime = performance.now();
     renderMetrics.lastRenderDuration = endTime - startTime;
     renderMetrics.lastRenderMode = renderLog.mode;
+    if (renderContext && renderContext.diagnostics) {
+      renderContext.diagnostics.duration = renderMetrics.lastRenderDuration;
+    }
   };
 
   // =========================================================================
@@ -243,7 +276,30 @@ const RenderManager = (() => {
     _setDashboardPanelVisible(document.getElementById('resumo'), false);
     _setDashboardPanelVisible(document.getElementById('graficoMl'), false);
 
-    // Renderizar tabela
+
+    // Renderizar painel CAMPOS BIM (semantic inspector)
+    const selectColumns = document.getElementById('selectColumns');
+    if (selectColumns) {
+      if (window.Runtime.flags.semanticInspector && window.semanticInspectorRenderer) {
+        // Exemplo de contexto mínimo; pode ser expandido conforme necessário
+        const renderContext = {
+          visibleFields: window.tableState?.visibleFields || [],
+          checkedFields: window.tableState?.checkedFields || [],
+          activeField: window.tableState?.activeField || null,
+          showMeta: true,
+          showChips: true,
+          i18n: window.i18n || null
+        };
+        selectColumns.innerHTML = window.semanticInspectorRenderer.renderSemanticInspector(
+          window.FIELD_GROUPS || [],
+          renderContext
+        );
+      } else if (typeof renderLegacyColumns === 'function') {
+        renderLegacyColumns(window.tableState);
+      }
+    }
+
+    // Renderizar tabela (mantém procedural)
     if (typeof renderTabela === 'function') {
       renderTabela(elementosFiltrados);
     }

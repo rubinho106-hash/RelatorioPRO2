@@ -167,6 +167,10 @@ button:focus-visible {
 .details-action-btn:hover,
 .modal .btn:hover {
     transform: translateY(-1px);
+    filter: brightness(0.92);
+    color: #fff !important;
+    background-color: #1a2231 !important;
+    border-color: #324055 !important;
 }
 
 #tabela,

@@ -1,0 +1,96 @@
+<div class="field-group geometry">
+    <div class="field-group-header">
+        <div class="field-group-title">GEOMETRIA</div>
+        <div class="field-group-count">8</div>
+    </div>
+    <div class="field-group-body">
+        <div class="field-row active">
+            <input type="checkbox" class="field-checkbox" checked />
+            <div class="field-content">
+                <div class="field-label">Volume</div>
+                <div class="field-meta">Métrica tridimensional</div>
+            </div>
+            <div class="field-chips">
+                <div class="field-chip unit">m³</div>
+                <div class="field-chip type">NUM</div>
+            </div>
+        </div>
+        <!-- ...outras .field-row... -->
+    </div>
+</div>// semanticInspectorRenderer.js
+
+function renderEmptyState() {
+return `
+<div class="empty-state">
+    <div class="empty-icon">📐</div>
+    Selecione campos BIM para montar sua visualização.
+</div>
+`;
+}
+
+function renderFieldChip(chip) {
+return `<div class="field-chip">${chip}</div>`;
+}
+
+function renderFieldChips(field) {
+// Suporte a múltiplos chips por campo (unit, type, meta, etc)
+const chips = [];
+if (field.chip) chips.push(renderFieldChip(field.chip));
+if (field.unit) chips.push(renderFieldChip(field.unit));
+if (field.type) chips.push(renderFieldChip(field.type));
+// Adicione outros chips semânticos conforme necessário
+return chips.join('');
+}
+
+function renderFieldRow(field, checked = false, active = false) {
+return `
+<div class="field-row${active ? ' active' : ''}">
+    <input type="checkbox" class="field-checkbox" ${checked ? 'checked' : '' } />
+    <div class="field-content">
+        <div class="field-label">${field.label}</div>
+        ${field.description ? `<div class="field-meta">${field.description}</div>` : ''}
+    </div>
+    <div class="field-chips">
+        ${renderFieldChips(field)}
+    </div>
+</div>
+`;
+}
+
+function renderFieldHeader(group) {
+return `
+<div class="field-group-header">
+    <div class="field-group-title">${group.title}</div>
+    <div class="field-group-count">${group.fields.length}</div>
+</div>
+`;
+}
+
+function renderFieldGroup(group, visibleFields, checkedFields = []) {
+// visibleFields: array de keys visíveis (ex: tableState.visibleColumns)
+const rows = group.fields
+.filter(field => !visibleFields || visibleFields.includes(field.key))
+.map(field =>
+renderFieldRow(
+field,
+checkedFields.includes(field.key),
+false // active: pode ser ajustado conforme o state
+)
+)
+.join('');
+if (!rows) return '';
+return `
+<div class="field-group ${group.class}">
+    ${renderFieldHeader(group)}
+    <div class="field-group-body">
+        ${rows}
+    </div>
+</div>
+`;
+}
+
+function renderSemanticInspector(schemaGroups, visibleFields, checkedFields) {
+// schemaGroups: FIELD_GROUPS do SchemaRegistry
+// visibleFields: array de keys visíveis
+// checkedFields: array de keys marcadas
+const groupsHtml =

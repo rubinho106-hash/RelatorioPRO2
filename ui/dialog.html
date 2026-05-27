@@ -108,7 +108,7 @@
       position: absolute;
       top: 0;
       left: auto;
-      width: 280px;
+      width: 420px;
       max-height: 60vh;
       overflow-y: auto;
       background: #fff;
@@ -3103,6 +3103,17 @@
   <script src="js/edit-table.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/export-excel.js"></script>
+
+  <!-- Bootstrap centralizado (Foundation Layer) -->
+  <script type="module">
+    import { initializeApp } from "./js/app/bootstrap.js";
+    if (!window.__RELATORIOPRO_BOOTSTRAPPED__) {
+      window.__RELATORIOPRO_BOOTSTRAPPED__ = true;
+      document.addEventListener('DOMContentLoaded', async () => {
+        await initializeApp();
+      });
+    }
+  </script>
 </body>
 
 </html>
