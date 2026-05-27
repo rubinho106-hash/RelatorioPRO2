@@ -1,0 +1,55 @@
+.modal {
+    backdrop-filter: blur(3px);
+    background: rgba(5, 10, 20, 0.62);
+}
+
+.modal-dialog {
+    animation: rp-modal-in var(--rp-motion-base) var(--rp-motion-ease);
+}
+
+@keyframes rp-modal-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.985);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.modal-content {
+    border-radius: var(--rp-radius-md);
+    border: 1px solid var(--rp-border);
+    box-shadow: var(--rp-shadow-lg);
+    background: linear-gradient(160deg, #1a2231 0%, #131a27 100%);
+}
+
+.modal-header,
+.modal-footer {
+    border-color: var(--rp-border);
+}
+
+.modal .btn,
+.modal-close,
+.tag-window-btn,
+.ifc-summary-btn,
+.tag-dashboard-btn {
+    border-radius: var(--rp-radius-sm);
+    min-height: 32px;
+    transition:
+        background var(--rp-transition-normal) var(--rp-motion-ease),
+        border-color var(--rp-transition-normal) var(--rp-motion-ease),
+        color var(--rp-transition-normal) var(--rp-motion-ease),
+        box-shadow var(--rp-transition-normal) var(--rp-motion-ease),
+        transform var(--rp-transition-fast) var(--rp-motion-ease);
+}
+
+.modal .btn:hover,
+.modal-close:hover,
+.tag-window-btn:hover,
+.ifc-summary-btn:hover,
+.tag-dashboard-btn:hover {
+    transform: translateY(-1px);
+}

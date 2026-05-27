@@ -1,278 +1,334 @@
 // =============================================================================
-// KPI Cards Module — Isolated KPI Rendering Component
+// KPI Cards Module — Dynamic Schema-driven Widgets
 // =============================================================================
-// Responsabilidade: Renderizar cards de KPI (métricas principais)
-// Entrada: Estado (AppState)
-// Saída: DOM atualizado
-// Dependências: KPIEngine, AppState (read-only)
 
 'use strict';
 
 const KPICardsModule = (() => {
-  // =========================================================================
-  // RENDER KPI CARDS
-  // =========================================================================
+  const _normalize = (raw) => String(raw || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '_')
+    .trim();
 
-  /**
-   * Renderiza cards de KPI baseado no modo atual
-   * @param {Object} state - Estado atual do AppState
-   * @returns {void}
-   */
-  const render = (state) => {
-    const container = document.getElementById('globalSummary');
-    if (!container) { return; }
+  const _renderCards = (container, cards, emptyMessage) => {
+    const html = (cards || [])
+      .map((card) => {
+        const meta = card.meta ? '<span class="meta">' + card.meta + '</span>' : '';
+        return '<div class="summary-card"><h4>' + card.title + '</h4><p>' + card.value + '</p>' + meta + '</div>';
+      })
+      .join('');
 
-    // Renderizar baseado no modo
-    if (state.currentElement) {
-      _renderElementKPI(state, container);
-    } else if (state.currentTag) {
-      _renderTagKPI(state, container);
-    } else {
-      _renderGlobalKPI(state, container);
-    }
+    container.innerHTML = html || '<div class="rp-empty-state">' + (emptyMessage || 'Nenhum campo selecionado no Data View.') + '</div>';
   };
 
-  // =========================================================================
-  // ELEMENTO MODE - KPI de um elemento individual
-  // =========================================================================
-
-  const _renderElementKPI = (state, container) => {
-    const element = _findElementByKey(state.currentElement);
-    if (!element) {
-      container.innerHTML = '<div style="color:#64748b;padding:16px;font-size:12px;">Elemento não encontrado.</div>';
-      return;
+  const _fieldMeta = (fieldKey) => {
+    if (!window.BIMSchemaRegistry || typeof window.BIMSchemaRegistry.getField !== 'function') {
+      return null;
     }
-
-    const tag = String(element.tag || state.currentTag || '-');
-    const ifc = String(element.ifc || '-');
-    const pav = String((element.storey || element.pavimento) || '-');
-    const len = _parseNumber(element.comprimento || element.metro_linear_total || 0);
-    const area = _parseNumber(element.area || element.area_total || 0);
-    const vol = _parseNumber(element.volume || element.volume_total || 0);
-    const concCost = _parseNumber(element.concrete_cost || element.concrete_cost_total || 0);
-    const epsCost = _parseNumber(element.eps_cost || element.eps_cost_total || 0);
-    const totalCost = concCost + epsCost;
-    const slabWeight = _parseNumber(element.slab_weight_kg || element.slab_weight_total_kg || 0);
-
-    container.innerHTML =
-      '<div class="summary-card"><h4>Elemento Selecionado</h4><p>' + _formatLabel(element) + '</p><span class="meta">Modo: ELEMENTO</span></div>' +
-      '<div class="summary-card"><h4>TAG</h4><p>' + tag + '</p></div>' +
-      '<div class="summary-card"><h4>IFC</h4><p>' + ifc + '</p></div>' +
-      '<div class="summary-card"><h4>Pavimento</h4><p>' + pav + '</p></div>' +
-      '<div class="summary-card"><h4>Comprimento</h4><p>' + len.toFixed(2) + ' m</p></div>' +
-      '<div class="summary-card"><h4>Área</h4><p>' + area.toFixed(2) + ' m²</p></div>' +
-      '<div class="summary-card"><h4>Volume</h4><p>' + vol.toFixed(2) + ' m³</p></div>' +
-      '<div class="summary-card"><h4>Custo</h4><p>R$ ' + totalCost.toFixed(2) + '</p></div>' +
-      '<div class="summary-card"><h4>Peso</h4><p>' + slabWeight.toFixed(0) + ' kg</p></div>';
+    const resolved = typeof window.BIMSchemaRegistry.resolveFieldKey === 'function'
+      ? window.BIMSchemaRegistry.resolveFieldKey(fieldKey)
+      : fieldKey;
+    return window.BIMSchemaRegistry.getField(resolved || fieldKey);
   };
 
-  // =========================================================================
-  // TAG MODE - KPI de uma tag selecionada
-  // =========================================================================
-
-  const _renderTagKPI = (state, container) => {
-    const tag = state.currentTag;
-    const tagModel = window.tagModel || {};
-    const grupo = tagModel[tag];
-
-    if (!grupo) {
-      container.innerHTML = '<div style="color:#64748b;padding:16px;font-size:12px;">TAG não encontrada.</div>';
-      return;
+  const _schemaLabel = (fieldKey) => {
+    const meta = _fieldMeta(fieldKey);
+    if (meta && meta.label) { return String(meta.label); }
+    if (typeof window.getColumnDisplayLabel === 'function') {
+      return String(window.getColumnDisplayLabel(fieldKey) || fieldKey);
     }
-
-    const storeyFilter = state && state.filters ? state.filters.storey : state.storey;
-    const elementos = _getTagElementsByFilter(grupo, storeyFilter);
-    const resumo = _summarizeElements(elementos);
-
-    const totalElementosTag = Number(resumo.totalElementos || 0);
-    const totalGruposTag = Number(resumo.totalGrupos || 0);
-    const totalMlTag = Number(resumo.metroLinear || 0);
-    const totalAreaTag = Number(resumo.area || 0);
-    const totalVolumeTag = Number(resumo.volume || 0);
-
-    const eficienciaTag = totalElementosTag > 0
-      ? Math.max(0, ((1 - (totalGruposTag / totalElementosTag)) * 100))
-      : 0;
-
-    const inconsistenciasTag = elementos.reduce(function (acc, e) {
-      const semIfc = !e || !e.ifc || String(e.ifc).trim() === '' || String(e.ifc).trim() === '-';
-      if (!semIfc) { return acc; }
-      return acc + Math.max(1, Math.round(_parseNumber(e.quantidade || e.quantity || 1)));
-    }, 0);
-
-    const qualidadeIfcTag = totalElementosTag > 0
-      ? Math.max(0, ((1 - (inconsistenciasTag / totalElementosTag)) * 100))
-      : 100;
-
-    const filtroPav = storeyFilter ? storeyFilter : 'Todos os pavimentos';
-
-    container.innerHTML =
-      '<div class="summary-card"><h4>TAG Selecionada</h4><p>' + tag + '</p><span class="meta">Pavimento: ' + filtroPav + '</span></div>' +
-      '<div class="summary-card"><h4>Elementos da TAG</h4><p>' + totalElementosTag + '</p></div>' +
-      '<div class="summary-card"><h4>Grupos da TAG</h4><p>' + totalGruposTag + '</p></div>' +
-      '<div class="summary-card"><h4>Eficiência da TAG</h4><p>' + eficienciaTag.toFixed(0) + '%</p></div>' +
-      '<div class="summary-card"><h4>Metro Linear (TAG)</h4><p>' + totalMlTag.toFixed(2) + ' m</p></div>' +
-      '<div class="summary-card"><h4>Área (TAG)</h4><p>' + totalAreaTag.toFixed(2) + ' m²</p></div>' +
-      '<div class="summary-card"><h4>Volume (TAG)</h4><p>' + totalVolumeTag.toFixed(2) + ' m³</p></div>' +
-      '<div class="summary-card"><h4>IFC sem Classificação</h4><p>' + inconsistenciasTag + '</p></div>' +
-      '<div class="summary-card"><h4>Qualidade IFC (TAG)</h4><p>' + qualidadeIfcTag.toFixed(0) + '%</p><span class="meta">Base: TAG selecionada</span></div>';
+    return String(fieldKey || 'Campo');
   };
 
-  // =========================================================================
-  // GLOBAL MODE - KPI globais de todo projeto
-  // =========================================================================
+  const _visibleFields = () => {
+    if (!window.BIMDataView || typeof window.BIMDataView.getVisibleColumns !== 'function') {
+      return [];
+    }
 
-  const _renderGlobalKPI = (state, container) => {
-    const tagModel = window.tagModel || {};
+    const blocked = new Set([
+      'id', 'ordinal', 'image', 'definition', 'entity', 'description',
+      'url', 'status', 'owner', 'selection', 'in_model'
+    ]);
 
-    let topMlTag = null;
-    let topAreaTag = null;
-    let totalElementos = 0;
-    let totalGrupos = 0;
-    let totalMetroLinear = 0;
-    let totalArea = 0;
-    let totalVolume = 0;
+    return window.BIMDataView.getVisibleColumns()
+      .map((key) => String(key || '').trim())
+      .filter((key) => key && !blocked.has(_normalize(key)))
+      .map((key) => {
+        if (window.BIMSchemaRegistry && typeof window.BIMSchemaRegistry.resolveFieldKey === 'function') {
+          return window.BIMSchemaRegistry.resolveFieldKey(key) || key;
+        }
+        return key;
+      })
+      .filter((key, index, arr) => arr.indexOf(key) === index)
+      .filter((key) => {
+        const meta = _fieldMeta(key);
+        return !meta || meta.chartable !== false;
+      });
+  };
 
-    Object.keys(tagModel).forEach(function (tag) {
-      const grupo = tagModel[tag] || {};
-      const grupoMl = Number(grupo.metro_linear || 0);
-      const grupoArea = Number(grupo.area || 0);
-      totalElementos += Number(grupo.total_elementos || (grupo.elementos || []).length || 0);
-      totalGrupos += Number(grupo.total_grupos || grupo.quantidade || 0);
-      totalMetroLinear += grupoMl;
-      totalArea += grupoArea;
-      totalVolume += Number(grupo.volume || 0);
+  const _fieldAliases = {
+    nome: ['instance', 'nome', 'name', 'entity', 'description'],
+    ifc: ['ifc', 'ifc_type', 'ifcclass', 'ifc_class', 'ifc_tipo'],
+    tag: ['tag'],
+    pavimento: ['storey', 'pavimento'],
+    quantidade: ['quantidade', 'quantity'],
+    area: ['area_total', 'area', 'area_xy', 'area_xz'],
+    volume: ['volume_total', 'volume'],
+    comprimento: ['metro_linear_total', 'comprimento', 'metro_linear', 'len_xyz', 'len_x', 'len_y', 'len_z', 'len_xy', 'len_xz'],
+    peso: ['peso', 'weight', 'slab_weight_total_kg', 'slab_weight_kg', 'size'],
+    custo: ['total', 'price', 'custo', 'concrete_cost_total', 'eps_cost_total', 'concrete_cost', 'eps_cost'],
+    fire_rating: ['fire_rating', 'firerating', 'fire_rating_value', 'bim_ifc_fire_rating']
+  };
 
-      if (!topMlTag || grupoMl > topMlTag.valor) {
-        topMlTag = { tag: tag, valor: grupoMl };
-      }
-      if (!topAreaTag || grupoArea > topAreaTag.valor) {
-        topAreaTag = { tag: tag, valor: grupoArea };
+  const _candidateKeys = (fieldKey) => {
+    const normalized = _normalize(fieldKey);
+    const base = [String(fieldKey || '')].filter(Boolean);
+
+    Object.keys(_fieldAliases).forEach((bucket) => {
+      const aliases = _fieldAliases[bucket] || [];
+      if (normalized === bucket || aliases.some((alias) => _normalize(alias) === normalized)) {
+        base.push(...aliases);
       }
     });
 
-    const eficienciaAgrupamento = totalElementos > 0
-      ? Math.max(0, ((1 - (totalGrupos / totalElementos)) * 100))
-      : 0;
-
-    const dashboardModel = window.relatorioTagDashboard || null;
-    const totalInconsistencias = Number(dashboardModel && dashboardModel.all ? dashboardModel.all.mismatches || 0 : 0);
-    const qualidadeIfc = totalElementos > 0
-      ? Math.max(0, ((1 - (totalInconsistencias / totalElementos)) * 100))
-      : 100;
-
-    const topMlLabel = topMlTag ? topMlTag.tag : '-';
-    const topMlValue = topMlTag ? topMlTag.valor.toFixed(1) + ' m' : '-';
-    const topAreaLabel = topAreaTag ? topAreaTag.tag : '-';
-    const topAreaValue = topAreaTag ? topAreaTag.valor.toFixed(1) + ' m²' : '-';
-
-    container.innerHTML =
-      '<div class="summary-card"><h4>Elementos do Projeto</h4><p>' + totalElementos + '</p></div>' +
-      '<div class="summary-card"><h4>Grupos Técnicos</h4><p>' + totalGrupos + '</p></div>' +
-      '<div class="summary-card"><h4>Eficiência de Agrupamento</h4><p>' + eficienciaAgrupamento.toFixed(0) + '%</p></div>' +
-      '<div class="summary-card"><h4>Metro Linear Total</h4><p>' + totalMetroLinear.toFixed(2) + ' m</p></div>' +
-      '<div class="summary-card"><h4>Área Total</h4><p>' + totalArea.toFixed(2) + ' m²</p></div>' +
-      '<div class="summary-card"><h4>Volume Total</h4><p>' + totalVolume.toFixed(2) + ' m³</p></div>' +
-      '<div class="summary-card"><h4>Top TAG (ML)</h4><p>' + topMlLabel + '</p><span class="meta">' + topMlValue + '</span></div>' +
-      '<div class="summary-card"><h4>Top TAG (Área)</h4><p>' + topAreaLabel + '</p><span class="meta">' + topAreaValue + '</span></div>' +
-      '<div class="summary-card"><h4>Qualidade IFC</h4><p>' + qualidadeIfc.toFixed(0) + '%</p><span class="meta">' + totalInconsistencias + ' inconsistência(s) TAG x IFC</span></div>';
+    return Array.from(new Set(base.filter(Boolean)));
   };
 
-  // =========================================================================
-  // HELPERS
-  // =========================================================================
+  const _getFieldValue = (row, fieldKey) => {
+    if (!row || !fieldKey) { return null; }
+    const candidates = _candidateKeys(fieldKey);
 
-  const _findElementByKey = (key) => {
-    const wanted = String(key || '').trim();
-    if (!wanted) { return null; }
-    const all = _getAllTagElements();
-    for (let i = 0; i < all.length; i += 1) {
-      const e = all[i];
-      if (_getElementKey(e) === wanted) { return e; }
+    for (let i = 0; i < candidates.length; i += 1) {
+      const key = candidates[i];
+      if (Object.prototype.hasOwnProperty.call(row, key) && row[key] !== null && row[key] !== undefined && row[key] !== '') {
+        return row[key];
+      }
     }
+
+    const wanted = _normalize(fieldKey);
+    const rowKeys = Object.keys(row);
+    for (let i = 0; i < rowKeys.length; i += 1) {
+      const key = rowKeys[i];
+      if (_normalize(key) === wanted && row[key] !== null && row[key] !== undefined && row[key] !== '') {
+        return row[key];
+      }
+    }
+
     return null;
+  };
+
+  const _parseNumber = (value) => {
+    if (typeof value === 'number') { return Number.isFinite(value) ? value : NaN; }
+    if (typeof value !== 'string') { return Number(value); }
+
+    const trimmed = value.trim();
+    if (!trimmed) { return NaN; }
+
+    const normalized = trimmed
+      .replace(/\s+/g, '')
+      .replace(/\.(?=\d{3}(\D|$))/g, '')
+      .replace(/,(?=\d{3}(\D|$))/g, '')
+      .replace(',', '.');
+
+    return Number(normalized);
+  };
+
+  const _unitForField = (fieldKey) => {
+    const meta = _fieldMeta(fieldKey);
+    if (meta && meta.unit) { return ' ' + String(meta.unit); }
+
+    const key = _normalize(fieldKey);
+    if (key.indexOf('area') >= 0) { return ' m²'; }
+    if (key.indexOf('volume') >= 0) { return ' m³'; }
+    if (key.indexOf('comprimento') >= 0 || key.indexOf('metro_linear') >= 0 || key.indexOf('len_') === 0) { return ' m'; }
+    if (key.indexOf('peso') >= 0 || key.indexOf('weight') >= 0) { return ' kg'; }
+    if (key.indexOf('price') >= 0 || key.indexOf('custo') >= 0 || key === 'total') { return ' R$'; }
+    return '';
+  };
+
+  const _formatNumber = (value, precision) => {
+    return Number(value || 0).toLocaleString('pt-BR', {
+      minimumFractionDigits: precision,
+      maximumFractionDigits: precision
+    });
+  };
+
+  const _isMostlyNumeric = (values) => {
+    if (!values || values.length === 0) { return false; }
+    const numericCount = values
+      .map((v) => _parseNumber(v))
+      .filter((n) => Number.isFinite(n))
+      .length;
+    return numericCount > 0 && (numericCount / values.length) >= 0.65;
+  };
+
+  const _buildNumericCard = (title, fieldKey, values) => {
+    const numeric = values
+      .map((v) => _parseNumber(v))
+      .filter((n) => Number.isFinite(n));
+    if (numeric.length === 0) { return null; }
+
+    const meta = _fieldMeta(fieldKey);
+    const canAggregate = meta ? meta.aggregatable !== false : true;
+    const sum = numeric.reduce((acc, n) => acc + n, 0);
+    const avg = sum / numeric.length;
+    const unit = _unitForField(fieldKey);
+    const isCurrency = unit.trim().toUpperCase() === 'R$';
+
+    const displayValue = canAggregate
+      ? (isCurrency ? ('R$ ' + _formatNumber(sum, 2)) : (_formatNumber(sum, Math.abs(sum) >= 1000 ? 0 : 2) + unit))
+      : (isCurrency ? ('R$ ' + _formatNumber(avg, 2)) : (_formatNumber(avg, 2) + unit));
+
+    return {
+      title: title,
+      value: displayValue,
+      meta: (canAggregate ? 'soma' : 'media') + ': ' + (isCurrency ? ('R$ ' + _formatNumber(avg, 2)) : (_formatNumber(avg, 2) + unit)) + ' • n=' + numeric.length
+    };
+  };
+
+  const _buildCategoricalCard = (title, values) => {
+    if (!values || values.length === 0) { return null; }
+
+    const freq = new Map();
+    values.forEach((v) => {
+      const label = String(v || '').trim() || '-';
+      freq.set(label, (freq.get(label) || 0) + 1);
+    });
+
+    let topValue = '-';
+    let topCount = 0;
+    freq.forEach((count, label) => {
+      if (count > topCount) {
+        topValue = label;
+        topCount = count;
+      }
+    });
+
+    return {
+      title: title,
+      value: topValue,
+      meta: topCount + ' de ' + values.length + ' ocorrência(s)'
+    };
+  };
+
+  const _buildFieldCard = (fieldKey, rows) => {
+    const values = (rows || [])
+      .map((row) => _getFieldValue(row, fieldKey))
+      .filter((v) => v !== null && v !== undefined && String(v).trim() !== '');
+
+    if (values.length === 0) { return null; }
+
+    const title = _schemaLabel(fieldKey);
+    if (_isMostlyNumeric(values)) {
+      return _buildNumericCard(title, fieldKey, values);
+    }
+
+    return _buildCategoricalCard(title, values);
+  };
+
+  const _buildContextCard = (mode, rows, state) => {
+    const modeLabel = mode === 'element' ? 'ELEMENTO' : (mode === 'tag' ? 'TAG' : 'GLOBAL');
+    const contextLabel = mode === 'tag'
+      ? ('Contexto: ' + String(state.currentTag || '-'))
+      : (mode === 'element' ? 'Contexto: Elemento' : 'Contexto: Projeto');
+
+    return {
+      title: contextLabel,
+      value: rows.length + ' registro(s)',
+      meta: 'modo ' + modeLabel
+    };
+  };
+
+  const _getElementKey = (row) => {
+    if (!row) { return ''; }
+    return String(row.persistent_id || row.highlight_id || row.id || '').trim();
   };
 
   const _getAllTagElements = () => {
     if (!window.tagModel) { return []; }
     return Object.keys(window.tagModel).reduce(function (acc, tag) {
-      const grupo = window.tagModel[tag] || {};
-      const elements = Array.isArray(grupo.elementos) ? grupo.elementos : [];
+      const group = window.tagModel[tag] || {};
+      const elements = Array.isArray(group.elementos) ? group.elementos : [];
       return acc.concat(elements);
     }, []);
   };
 
-  const _getTagElementsByFilter = (grupo, storeyFilter) => {
-    const elementos = Array.isArray(grupo && grupo.elementos) ? grupo.elementos : [];
-    if (!storeyFilter) { return elementos; }
-    return elementos.filter(function (e) {
-      return String((e && (e.storey || e.pavimento)) || '') === storeyFilter;
-    });
-  };
+  const _findElementByKey = (key) => {
+    const wanted = String(key || '').trim();
+    if (!wanted) { return null; }
 
-  const _summarizeElements = (elements) => {
-    return (elements || []).reduce(function (acc, e) {
-      const rowElementos = Math.max(1, Math.round(_parseNumber(e && (e.quantidade || e.quantity) ? (e.quantidade || e.quantity) : 1)));
-      const rowGrupos = (e && e.is_group) ? 1 : rowElementos;
-      acc.totalElementos += rowElementos;
-      acc.totalGrupos += rowGrupos;
-      var _sml = e && (e.metro_linear_total || e.comprimento);
-      acc.metroLinear += Number(_parseNumber(_sml ? _sml : 0));
-      var _sarea = e && (e.area_total || e.area);
-      acc.area += Number(_parseNumber(_sarea ? _sarea : 0));
-      var _svol = e && (e.volume_total || e.volume);
-      acc.volume += Number(_parseNumber(_svol ? _svol : 0));
-      var _epsVol = e && (e.eps_volume_total || e.eps_volume_m3);
-      acc.epsVolume += Number(_parseNumber(_epsVol ? _epsVol : 0));
-      var _concCost = e && (e.concrete_cost_total || e.concrete_cost);
-      acc.concreteCost += Number(_parseNumber(_concCost ? _concCost : 0));
-      var _epsCost = e && (e.eps_cost_total || e.eps_cost);
-      acc.epsCost += Number(_parseNumber(_epsCost ? _epsCost : 0));
-      var _slabWeight = e && (e.slab_weight_total_kg || e.slab_weight_kg);
-      acc.slabWeightKg += Number(_parseNumber(_slabWeight ? _slabWeight : 0));
-      return acc;
-    }, {
-      totalElementos: 0,
-      totalGrupos: 0,
-      metroLinear: 0,
-      area: 0,
-      volume: 0,
-      epsVolume: 0,
-      concreteCost: 0,
-      epsCost: 0,
-      slabWeightKg: 0
-    });
-  };
-
-  const _getElementKey = (e) => {
-    if (!e) { return ''; }
-    return String(e.persistent_id || e.highlight_id || e.id || '').trim();
-  };
-
-  const _formatLabel = (e) => {
-    if (!e) { return 'Elemento'; }
-    return String(e.instance || e.nome || e.entity || _getElementKey(e) || 'Elemento');
-  };
-
-  const _parseNumber = (val) => {
-    if (typeof val === 'number') { return val; }
-    if (typeof val === 'string') {
-      return Number(val.replace(',', '.')) || 0;
+    const all = _getAllTagElements();
+    for (let i = 0; i < all.length; i += 1) {
+      if (_getElementKey(all[i]) === wanted) {
+        return all[i];
+      }
     }
-    return Number(val) || 0;
+    return null;
   };
 
-  // =========================================================================
-  // PUBLIC API
-  // =========================================================================
+  const _getTagElementsByFilter = (group, storeyFilter) => {
+    const elements = Array.isArray(group && group.elementos) ? group.elementos : [];
+    if (!storeyFilter) { return elements; }
+    return elements.filter((row) => String((row && (row.storey || row.pavimento)) || '') === storeyFilter);
+  };
+
+  const _rowsForMode = (state, mode) => {
+    if (mode === 'element') {
+      const element = _findElementByKey(state.currentElement);
+      return element ? [element] : [];
+    }
+
+    if (mode === 'tag') {
+      const group = (window.tagModel || {})[state.currentTag] || null;
+      if (!group) { return []; }
+      const storeyFilter = state && state.filters ? state.filters.storey : state.storey;
+      return _getTagElementsByFilter(group, storeyFilter);
+    }
+
+    return _getAllTagElements();
+  };
+
+  const _renderDynamicBySchema = (state, container) => {
+    const mode = state.currentElement ? 'element' : (state.currentTag ? 'tag' : 'global');
+    const rows = _rowsForMode(state, mode);
+
+    if (rows.length === 0) {
+      _renderCards(container, [], 'Sem dados para o contexto selecionado.');
+      return;
+    }
+
+    const fields = _visibleFields();
+    if (fields.length === 0) {
+      _renderCards(container, [], 'Nenhum campo visível no Data View.');
+      return;
+    }
+
+    const cards = [_buildContextCard(mode, rows, state)];
+
+    fields.forEach((fieldKey) => {
+      const card = _buildFieldCard(fieldKey, rows);
+      if (card) {
+        cards.push(card);
+      }
+    });
+
+    _renderCards(container, cards, 'Nenhum widget disponível para os campos selecionados.');
+  };
+
+  const render = (state) => {
+    const container = document.getElementById('globalSummary');
+    if (!container) { return; }
+    _renderDynamicBySchema(state || {}, container);
+  };
 
   return {
     render: render,
     debug() {
-      return { module: 'KPICardsModule', version: '1.0' };
+      return { module: 'KPICardsModule', version: '2.0' };
     }
   };
 })();
 
-// Exportar para global
 window.KPICardsModule = KPICardsModule;

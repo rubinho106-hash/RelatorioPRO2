@@ -1,7 +1,11 @@
 require_relative "python_bridge"
 require_relative "ui"
+require_relative "bim/resolver"
+require_relative "bim/selection_engine"
+require_relative "bim/visibility_engine"
 require "json"
 require "set"
+require "time"
 
 module RelatorioPRO
 	COMMAND_NAME = "Relatorio Engenharia PRO".freeze
@@ -12,6 +16,7 @@ module RelatorioPRO
 	LIVE_REFRESH_DEBOUNCE_SECONDS = 0.35
 	CAMERA_FOCUS_DURATION_SECONDS = 0.20
 	CAMERA_FOCUS_STEPS = 8
+	BIM_TRACE_ENABLED = ENV["BIM_TRACE"].to_s.strip.downcase == "true"
 	DYNAMIC_SKIP_DICT_PREFIXES = ["SU_"].freeze
 	DYNAMIC_SKIP_KEYS = %w[_formatversion _inst__x _inst__y _inst__z _lenx_formula _leny_formula _lenz_formula].freeze
 	MODEL_DEFAULT_SETTINGS = {
@@ -95,6 +100,10 @@ module RelatorioPRO
 		File.join(project_root, "ui", "dialog.html")
 	end
 
+	def toolbar_icon_path(size)
+		File.join(project_root, "ui", "images", "toolbar", "relatoriopro_#{size}.png")
+	end
+
 	def open_dialog
 		if defined?(@dialog) && @dialog && @dialog.visible?
 			@dialog.bring_to_front
@@ -115,6 +124,7 @@ module RelatorioPRO
 		register_runtime_callbacks(@dialog)
 
 		@dialog.set_on_closed do
+			restore_tag_isolation
 			detach_runtime_observers
 			cancel_live_refresh_timer
 			detach_selection_observer
@@ -133,6 +143,10 @@ module RelatorioPRO
 		return @plugin_command if defined?(@plugin_command) && @plugin_command
 
 		@plugin_command = ::UI::Command.new(COMMAND_NAME) { open_dialog }
+		small_icon = toolbar_icon_path(24)
+		large_icon = toolbar_icon_path(32)
+		@plugin_command.small_icon = small_icon if File.exist?(small_icon)
+		@plugin_command.large_icon = large_icon if File.exist?(large_icon)
 		@plugin_command.menu_text = COMMAND_NAME
 		@plugin_command.tooltip = COMMAND_NAME
 		@plugin_command.status_bar_text = "Abrir dashboard do RelatorioPRO"
@@ -208,8 +222,12 @@ module RelatorioPRO
 			Sketchup.active_model.selection.clear
 		end
 
-		dialog.add_action_callback("select_tag_entities") do |_ctx, tag_name, focus|
-			select_tag_entities(tag_name, focus: focus)
+		dialog.add_action_callback("select_tag_entities") do |_ctx, tag_name, focus, isolate|
+			select_tag_entities(tag_name, focus: focus, isolate: isolate)
+		end
+
+		dialog.add_action_callback("clear_tag_isolation") do |_ctx|
+			restore_tag_isolation
 		end
 
 		dialog.add_action_callback("zoomSelection") do |_ctx|
@@ -242,76 +260,92 @@ module RelatorioPRO
 		end
 	end
 
-	def select_entities(pids, clear: true)
-		model = Sketchup.active_model
-		selection = model.selection
-		selection.clear if clear
+	def bim_trace(event_name, payload = {})
+		return unless BIM_TRACE_ENABLED
 
-		found = []
-		Array(pids).each do |pid|
-			next if pid.nil?
-			entity = model.find_entity_by_persistent_id(pid.to_i)
-			next unless entity
-			selection.add(entity)
-			found << entity
-		end
-
-		found
+		normalized = {
+			event: event_name.to_s,
+			ts: Time.now.utc.iso8601(3)
+		}.merge(payload)
+		puts("[RelatorioPRO][BIM_TRACE] #{JSON.generate(normalized)}")
+	rescue StandardError
+		# tracing nunca deve quebrar runtime
+		nil
 	end
 
-	def select_tag_entities(tag_name, focus: false)
+	def select_entities(pids, clear: true)
 		model = Sketchup.active_model
-		return { success: false, count: 0, error: "no_model" } unless model
+		return [] unless model
 
-		tag_label = tag_name.to_s.strip
-		return { success: false, count: 0, error: "empty_tag" } if tag_label.empty?
+		Bim::SelectionEngine.select_entities(
+			model,
+			pids,
+			clear: clear,
+			trace: method(:bim_trace)
+		)
+	end
 
-		layer = find_layer_by_name(model, tag_label)
-		if layer && model.respond_to?(:layers) && model.layers.respond_to?(:current=)
-			model.layers.current = layer
+	def select_tag_entities(tag_name, focus: false, isolate: false)
+		model = Sketchup.active_model
+		Bim::SelectionEngine.select_tag_entities(
+			model: model,
+			tag_name: tag_name,
+			focus: focus,
+			isolate: isolate,
+			trace: method(:bim_trace),
+			on_focus: proc { |entities| focus_camera_on_entities(entities, smooth: true) },
+			on_isolate: proc { |layer, entities| apply_tag_isolation(layer, entities) },
+			on_restore: proc { restore_tag_isolation }
+		)
+	end
+
+	def apply_tag_isolation(target_layer, selected_entities = [])
+		model = Sketchup.active_model
+		Bim::VisibilityEngine.apply_tag_isolation(model, target_layer, selected_entities, trace: method(:bim_trace))
+	end
+
+	def restore_tag_isolation
+		model = Sketchup.active_model
+		return false unless model
+
+		restored = Bim::VisibilityEngine.restore_tag_isolation(model, trace: method(:bim_trace))
+
+		# Compatibilidade: restaura snapshot antigo por entidade.hidden, se existir.
+		if defined?(@tag_isolation_snapshot) && @tag_isolation_snapshot.is_a?(Hash) && !@tag_isolation_snapshot.empty?
+			@tag_isolation_snapshot.each do |pid, hidden_state|
+				entity = model.find_entity_by_persistent_id(pid.to_i)
+				next unless entity && entity.valid?
+				next unless entity.respond_to?(:hidden=)
+				entity.hidden = !!hidden_state
+			end
+			@tag_isolation_snapshot = {}
+			restored = true
 		end
 
-		entities = collect_entities_by_tag(model, tag_label)
-
-		selection = model.selection
-		selection.clear
-		entities.each { |entity| selection.add(entity) }
-
-		if focus && !entities.empty?
-			focus_camera_on_entities(entities, smooth: true)
-		end
-
-		{ success: true, count: entities.length, tag: tag_label }
+		restored
 	rescue StandardError => e
-		puts("[RelatorioPRO] select_tag_entities error: #{e.class}: #{e.message}")
-		{ success: false, count: 0, error: e.message }
+		puts("[RelatorioPRO] restore_tag_isolation error: #{e.class}: #{e.message}")
+		false
+	end
+
+	def normalize_tag_name(value)
+		Bim::Resolver.normalize_tag_name(value)
+	end
+
+	def relaxed_tag_token(value)
+		Bim::Resolver.relaxed_tag_token(value)
+	end
+
+	def tag_name_matches?(candidate_name, wanted_name)
+		Bim::Resolver.tag_name_matches?(candidate_name, wanted_name)
 	end
 
 	def find_layer_by_name(model, wanted_name)
-		target = wanted_name.to_s.strip
-		return nil if target.empty?
-
-		model.layers.each do |layer|
-			next unless layer
-			return layer if layer.name.to_s.casecmp(target).zero?
-		end
-
-		nil
-	rescue StandardError
-		nil
+		Bim::Resolver.find_layer_by_name(model, wanted_name)
 	end
 
 	def collect_entities_by_tag(model, tag_name)
-		target = tag_name.to_s.strip.upcase
-		return [] if target.empty?
-
-		instances = []
-		collect_instances_recursive(model.entities, instances)
-
-		instances.select do |entity|
-			next false unless entity.respond_to?(:layer) && entity.layer
-			entity.layer.name.to_s.upcase == target
-		end
+		Bim::Resolver.collect_entities_by_tag(model, tag_name)
 	end
 
 	def focus_camera_on_entities(entities, smooth: true)
@@ -350,6 +384,8 @@ module RelatorioPRO
 			view.camera = camera
 			view.invalidate
 		end
+
+		bim_trace("focus_camera_on_entities", entities: list.length, smooth: !!smooth)
 
 		true
 	rescue StandardError => e
@@ -680,41 +716,7 @@ module RelatorioPRO
 	end
 
 	def collect_instances_recursive(entities, output, visited = nil)
-		# Regra de contagem BIM:
-		# - Conta ComponentInstance e Group como entidades válidas.
-		# - Se Group for container (tem filhos Group/ComponentInstance), não conta o pai.
-		# - Expande apenas 1 nível dentro desse Group.
-		# - Nunca recursiona profundamente nem conta faces/arestas.
-		visited ||= Set.new
-		return unless entities
-
-		entities.each do |entity|
-			next unless entity.valid?
-			next unless entity.is_a?(Sketchup::ComponentInstance) || entity.is_a?(Sketchup::Group)
-
-			pid = entity.persistent_id
-			next if visited.include?(pid)
-
-			if entity.is_a?(Sketchup::Group)
-				child_instances = entity.entities.grep(Sketchup::ComponentInstance)
-				child_groups = entity.entities.grep(Sketchup::Group)
-				children = (child_instances + child_groups).select(&:valid?)
-
-				if !children.empty?
-					visited << pid
-					children.each do |child|
-						child_pid = child.persistent_id
-						next if visited.include?(child_pid)
-						visited << child_pid
-						output << child
-					end
-					next
-				end
-			end
-
-			visited << pid
-			output << entity
-		end
+		Bim::Resolver.collect_instances_one_level(entities, output, visited)
 	end
 
 	def build_row_from_entity(entity, ordinal)

@@ -90,12 +90,12 @@ const BreadcrumbModule = (() => {
       }
 
       // Nó
-      const attrs = node.clickable ? 'style="cursor:pointer;font-weight:600;"' : '';
+      const extraClass = node.clickable ? ' rp-cursor-pointer rp-fw-600' : '';
       const onclick = node.clickable ? ' onclick="_breadcrumbClick(\'' + _escapeForSingleQuote(node.label) + '\')"' : '';
 
-      html += '<span class="dashboard-crumb ' + node.cls + '" title="' + _escapeHtml(node.label) + '" ' + attrs + onclick + '>' +
-              node.icon + ' ' + _escapeHtml(node.label) +
-              '</span>';
+      html += '<span class="dashboard-crumb ' + node.cls + extraClass + '" title="' + _escapeHtml(node.label) + '"' + onclick + '>' +
+        node.icon + ' ' + _escapeHtml(node.label) +
+        '</span>';
     });
 
     return html;
@@ -109,7 +109,7 @@ const BreadcrumbModule = (() => {
    * Tratador de clique no breadcrumb
    * Exposto globalmente para ser chamado pelo onclick
    */
-  window._breadcrumbClick = function(label) {
+  window._breadcrumbClick = function (label) {
     if (label === 'GLOBAL') {
       // Volta para modo global
       AppState.backToGlobal();

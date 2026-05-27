@@ -1,0 +1,50 @@
+#globalSummary,
+#graficoMl,
+#kpis,
+#resumo,
+#elementDetails,
+#tabelaWrapper,
+#alerta {
+    width: 100%;
+}
+
+.summary-card,
+.card,
+#resumo,
+.card-kpi,
+.tag-kpi-card,
+.ifc-summary-card,
+.ifc-exec-card,
+#elementDetails {
+    border-radius: var(--rp-radius-md);
+    border: 1px solid var(--rp-border);
+    box-shadow: var(--rp-shadow-md);
+}
+
+.summary-card,
+.card,
+#graficoMl,
+#resumo {
+    background: linear-gradient(160deg, #1a2437 0%, #111b2b 100%);
+}
+
+.summary-card h4,
+.card h4,
+#graficoMl h4 {
+    color: var(--rp-text-secondary);
+}
+
+.summary-card p,
+.card p,
+.ifc-summary-card .value,
+.tag-kpi-card .value {
+    color: #ffffff;
+}
+
+.kpis {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.global-summary {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}

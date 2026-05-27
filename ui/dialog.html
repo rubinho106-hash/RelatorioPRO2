@@ -97,23 +97,17 @@
       flex-shrink: 0;
     }
 
-    /* Coluna dropdown wrapper */
+    /* Coluna wrapper (painel fixo) */
     .col-dropdown-wrap {
       position: relative;
       flex-shrink: 0;
     }
 
-    #buttonColumn {
-      border-radius: 6px;
-      font-size: 13px;
-      padding: 5px 14px;
-    }
-
     #col-panel {
-      display: none;
+      display: block;
       position: absolute;
-      top: calc(100% + 6px);
-      left: 0;
+      top: 0;
+      left: auto;
       width: 280px;
       max-height: 60vh;
       overflow-y: auto;
@@ -123,10 +117,6 @@
       box-shadow: 0 8px 24px rgba(37, 42, 46, 0.14);
       z-index: 500;
       padding: 10px;
-    }
-
-    #col-panel.open {
-      display: block;
     }
 
     /* Search */
@@ -1763,8 +1753,7 @@
     #findInput,
     #replaceInput,
     #filtroPavimento,
-    .filter-select,
-    #buttonColumn {
+    .filter-select {
       background: #1b2030;
       color: var(--rp-text-primary);
       border-color: var(--rp-border);
@@ -2203,9 +2192,20 @@
       background: #121a27;
     }
   </style>
+  <link rel="stylesheet" href="design/tokens.css">
+  <link rel="stylesheet" href="components/system.css">
+  <link rel="stylesheet" href="design/components/toolbar.css">
+  <link rel="stylesheet" href="design/components/shell.css">
+  <link rel="stylesheet" href="design/components/sidebar.css">
+  <link rel="stylesheet" href="design/components/cards.css">
+  <link rel="stylesheet" href="design/components/tables.css">
+  <link rel="stylesheet" href="design/components/modal.css">
+  <link rel="stylesheet" href="design/components/forms.css">
+  <link rel="stylesheet" href="design/components/motion.css">
+  <link rel="stylesheet" href="design/components/utilities.css">
 </head>
 
-<body>
+<body class="rp-theme layout-dashboard">
 
   <!-- â”€â”€ TOP BAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
   <div id="top-bar">
@@ -2221,33 +2221,25 @@
     </div>
   </div>
 
-  <!-- â”€â”€ TOOLBAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
-  <div id="toolbar-row" style="display:none;">
-    <div class="col-dropdown-wrap">
-      <button id="buttonColumn" class="btn btn-primary" type="button" data-translate-append="selectColumn">Coluna
-        &#9662;</button>
-      <div id="col-panel">
-        <div id="selectColumns"></div>
-      </div>
-    </div>
-
-    <div class="search-wrap">
-      <span id="findIcon" class="s-icon">&#128269;</span>
-      <input id="findInput" type="text" placeholder="Procurar..." autocomplete="off">
-      <span id="clearIcon" class="s-icon">&#10005;</span>
-    </div>
-
-    <div id="replaceBox">
-      <input id="replaceInput" type="text" placeholder="Substituir...">
-      <span id="replaceIcon">&#8644;</span>
-    </div>
-  </div>
-
   <!-- â”€â”€ TABLE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
   <!-- DASHBOARD (principal) -->
   <div id="dashboardContainer">
     <div id="menu" class="menu"></div>
-    <div class="content">
+    <div class="content has-fixed-bim-panel">
+      <!-- â”€â”€ TOOLBAR (LEGACY TABLE/LIST ONLY) â”€â”€ -->
+      <div id="toolbar-row" class="rp-hidden">
+        <div class="search-wrap">
+          <span id="findIcon" class="s-icon">&#128269;</span>
+          <input id="findInput" type="text" placeholder="Procurar..." autocomplete="off">
+          <span id="clearIcon" class="s-icon">&#10005;</span>
+        </div>
+
+        <div id="replaceBox">
+          <input id="replaceInput" type="text" placeholder="Substituir...">
+          <span id="replaceIcon">&#8644;</span>
+        </div>
+      </div>
+
       <div class="topbar">
         <div class="topbar-actions">
           <div id="dashboardBreadcrumb" class="dashboard-breadcrumb" aria-label="Caminho de contexto"></div>
@@ -2257,13 +2249,17 @@
         </div>
         <div class="dashboard-mode-row">
           <div class="dashboard-mode-left">
-            <button id="backToTagBtn" class="dashboard-nav-btn" type="button" style="display:none;">&larr; Analisar
+            <button id="backToTagBtn" class="dashboard-nav-btn rp-hidden" type="button">&larr; Analisar
               elementos da TAG</button>
-            <button id="backToGlobalBtn" class="dashboard-nav-btn" type="button" style="display:none;">&larr; Voltar ao
+            <button id="backToGlobalBtn" class="dashboard-nav-btn rp-hidden" type="button">&larr; Voltar ao
               Global</button>
-            <select id="filtroPavimento" class="filter-select" onchange="filtrarPavimento()">
-              <option value="">Todos os pavimentos</option>
-            </select>
+            <div class="col-dropdown-wrap">
+              <button id="bimPanelToggle" class="bim-panel-toggle" type="button"
+                aria-label="Mostrar ou ocultar painel Campos BIM" aria-expanded="true">&gt;</button>
+              <div id="col-panel">
+                <div id="selectColumns"></div>
+              </div>
+            </div>
           </div>
           <div id="modeIndicator" class="mode-indicator"></div>
         </div>
@@ -2274,7 +2270,7 @@
       <div id="alerta"></div>
       <div id="resumo"></div>
       <div id="elementDetails"></div>
-      <div id="tabelaWrapper" style="flex:1; overflow:auto; display:flex; flex-direction:column;">
+      <div id="tabelaWrapper" class="rp-fill-col-scroll">
         <table id="tabela"></table>
       </div>
     </div>
@@ -2289,6 +2285,12 @@
       <input type="checkbox" id="zoomToggle">
       <span class="zoom-track"></span>
       <span data-translate="zoomSelection">Focar selecao</span>
+    </label>
+
+    <label class="zoom-toggle-label rp-ml-md">
+      <input type="checkbox" id="isolateTagToggle">
+      <span class="zoom-track"></span>
+      <span data-translate="isolateTag">Isolar TAG</span>
     </label>
 
     <button id="ifcSummaryBtn" class="ifc-summary-btn" type="button" data-translate="ifcSummary">Resumo IFC</button>
@@ -2823,21 +2825,6 @@
       });
     }
 
-    // Coluna button â†’ toggle col-panel dropdown
-    document.getElementById('buttonColumn').addEventListener('click', function (e) {
-      e.stopPropagation();
-      document.getElementById('col-panel').classList.toggle('open');
-    });
-
-    // Close col-panel when clicking outside
-    document.addEventListener('click', function (e) {
-      var panel = document.getElementById('col-panel');
-      var btn = document.getElementById('buttonColumn');
-      if (panel && !panel.contains(e.target) && e.target !== btn) {
-        panel.classList.remove('open');
-      }
-    });
-
     // Image preview
     document.addEventListener('click', function (event) {
       var image = event.target.closest('#myTable td img');
@@ -2853,6 +2840,31 @@
         window.sketchup.zoomSelection();
       }
     });
+
+    // Isolate TAG toggle
+    var isolateTagToggle = document.getElementById('isolateTagToggle');
+    if (isolateTagToggle) {
+      isolateTagToggle.addEventListener('change', function () {
+        if (typeof Bridge === 'undefined') { return; }
+
+        if (!this.checked) {
+          if (typeof Bridge.clearTagIsolation === 'function') {
+            Bridge.clearTagIsolation();
+          }
+          return;
+        }
+
+        var tag = (typeof AppState !== 'undefined' && AppState.getCurrentTag)
+          ? String(AppState.getCurrentTag() || '').trim()
+          : '';
+
+        if (!tag || typeof Bridge.selectTagEntities !== 'function') { return; }
+
+        var zoomToggle = document.getElementById('zoomToggle');
+        var shouldFocus = !!(zoomToggle && zoomToggle.checked);
+        Bridge.selectTagEntities(tag, { focus: shouldFocus, isolate: true });
+      });
+    }
 
     // IFC summary modal
     document.getElementById('ifcSummaryBtn').addEventListener('click', function () {
@@ -3069,9 +3081,12 @@
   <script src="languages/language.js"></script>
   <!-- Core Architecture Foundation (LOAD ORDER CRITICAL) -->
   <script src="js/core/state.js"></script> <!-- AppState singleton -->
+  <script src="js/core/layoutState.js"></script> <!-- Layout mode state -->
+  <script src="js/core/viewRegistry.js"></script> <!-- View registry -->
   <script src="js/core/eventBus.js"></script> <!-- Event system -->
   <script src="js/services/bridge.js"></script> <!-- SketchUp abstraction -->
   <script src="js/core/kpiEngine.js"></script> <!-- Pure KPI calculation -->
+  <script src="js/core/schemaRegistry.js"></script> <!-- Semantic schema metadata -->
   <script src="js/core/renderManager.js"></script> <!-- Centralized render orchestration -->
   <script src="js/legacy/adapter.js"></script> <!-- Legacy compatibility layer -->
   <script src="js/core/quickCheck.js"></script> <!-- Quick verification tool -->

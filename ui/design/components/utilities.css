@@ -1,0 +1,87 @@
+/* Utility layer for progressive migration away from inline styles */
+
+/* Visibility */
+.rp-hidden {
+    display: none !important;
+}
+
+/* Spacing */
+.rp-ml-sm {
+    margin-left: var(--rp-space-2);
+}
+
+.rp-ml-md {
+    margin-left: var(--rp-space-3);
+}
+
+.rp-gap-sm {
+    gap: var(--rp-space-2);
+}
+
+.rp-gap-md {
+    gap: var(--rp-space-3);
+}
+
+.rp-gap-lg {
+    gap: var(--rp-space-4);
+}
+
+/* Layout */
+.rp-flex {
+    display: flex;
+}
+
+.rp-grid {
+    display: grid;
+}
+
+.rp-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.rp-fill-col-scroll {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Typography */
+.rp-title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--rp-text-primary);
+}
+
+.rp-subtitle {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--rp-text-secondary);
+}
+
+.rp-muted {
+    color: var(--rp-text-secondary);
+}
+
+.rp-fw-600 {
+    font-weight: 600;
+}
+
+.rp-cursor-pointer {
+    cursor: pointer;
+}
+
+.rp-empty-state {
+    padding: 16px;
+    font-size: 12px;
+    color: var(--rp-text-secondary);
+}
+
+.rp-empty-state-lg {
+    padding: 32px;
+    font-size: 14px;
+    color: var(--rp-text-secondary);
+}

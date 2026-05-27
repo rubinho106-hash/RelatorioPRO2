@@ -20,6 +20,16 @@
 const DetailsModule = (() => {
   'use strict';
 
+  const _isVisible = (keys) => {
+    if (!keys || (Array.isArray(keys) && keys.length === 0)) {
+      return true;
+    }
+    if (!window.BIMDataView || typeof window.BIMDataView.isFieldVisible !== 'function') {
+      return true;
+    }
+    return window.BIMDataView.isFieldVisible(keys);
+  };
+
   /**
    * Format a metric value with unit and proper precision
    * @private
@@ -128,7 +138,8 @@ const DetailsModule = (() => {
     const metrics = [];
 
     // Linear metric (metro linear)
-    if (element.metroLinear !== null && element.metroLinear !== undefined) {
+    if (_isVisible(['comprimento', 'metro_linear_total', 'metro_linear', 'len_x', 'len_y', 'len_z', 'len_xy', 'len_xz', 'len_xyz']) &&
+      element.metroLinear !== null && element.metroLinear !== undefined) {
       metrics.push({
         label: 'Comprimento',
         value: _formatMetric(element.metroLinear, 'm', 2),
@@ -137,7 +148,8 @@ const DetailsModule = (() => {
     }
 
     // Area
-    if (element.area !== null && element.area !== undefined && element.area > 0) {
+    if (_isVisible(['area', 'area_total', 'area_xy', 'area_xz']) &&
+      element.area !== null && element.area !== undefined && element.area > 0) {
       metrics.push({
         label: 'Área',
         value: _formatMetric(element.area, 'm²', 2),
@@ -146,7 +158,8 @@ const DetailsModule = (() => {
     }
 
     // Volume
-    if (element.volume !== null && element.volume !== undefined && element.volume > 0) {
+    if (_isVisible(['volume', 'volume_total']) &&
+      element.volume !== null && element.volume !== undefined && element.volume > 0) {
       metrics.push({
         label: 'Volume',
         value: _formatMetric(element.volume, 'm³', 3),
@@ -164,7 +177,8 @@ const DetailsModule = (() => {
     }
 
     // Weight (peso)
-    if (element.peso !== null && element.peso !== undefined && element.peso > 0) {
+    if (_isVisible(['peso', 'slab_weight_kg', 'slab_weight_total_kg', 'size']) &&
+      element.peso !== null && element.peso !== undefined && element.peso > 0) {
       metrics.push({
         label: 'Peso',
         value: _formatMetric(element.peso, 'kg', 2),
@@ -201,7 +215,8 @@ const DetailsModule = (() => {
     const properties = [];
 
     // Cost
-    if (element.custo !== null && element.custo !== undefined && element.custo > 0) {
+    if (_isVisible(['price', 'total', 'custo']) &&
+      element.custo !== null && element.custo !== undefined && element.custo > 0) {
       properties.push({
         label: 'Custo',
         value: _formatMetric(element.custo, 'R$', 2),
@@ -210,7 +225,7 @@ const DetailsModule = (() => {
     }
 
     // Material
-    if (element.material) {
+    if (_isVisible(['material']) && element.material) {
       properties.push({
         label: 'Material',
         value: _escapeHtml(element.material),
@@ -274,7 +289,7 @@ const DetailsModule = (() => {
     const ifcFields = [];
 
     // IFC Type
-    if (element.IFC || element.ifc) {
+    if (_isVisible(['ifc']) && (element.IFC || element.ifc)) {
       ifcFields.push({
         label: 'Tipo IFC',
         value: _escapeHtml(element.IFC || element.ifc),
@@ -283,7 +298,7 @@ const DetailsModule = (() => {
     }
 
     // IFC GUID
-    if (element.IFC_GUID || element.ifcGuid || element.guid) {
+    if (_isVisible(['ifc']) && (element.IFC_GUID || element.ifcGuid || element.guid)) {
       ifcFields.push({
         label: 'GUID',
         value: _escapeHtml(element.IFC_GUID || element.ifcGuid || element.guid),
@@ -342,6 +357,7 @@ const DetailsModule = (() => {
       if (skipFields.includes(key)) continue;
       if (value === null || value === undefined) continue;
       if (typeof value === 'object' || typeof value === 'function') continue;
+      if (!_isVisible([key])) continue;
 
       customAttrs.push({
         key: _escapeHtml(key),

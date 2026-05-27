@@ -1,0 +1,63 @@
+/* Generic table component + mapping to current ids */
+.rp-table,
+#tabela,
+#myTable,
+.ifc-summary-table,
+.tag-table {
+    width: 100%;
+    border-radius: var(--rp-radius-md);
+    overflow: hidden;
+    border: 1px solid var(--rp-table-border);
+    background: var(--rp-table-bg);
+}
+
+.rp-table thead th,
+#tabela th,
+#myTable thead tr th,
+.ifc-summary-table th,
+.tag-table th {
+    background: var(--rp-table-head);
+    color: var(--rp-table-head-text);
+    border-bottom: 1px solid var(--rp-table-border);
+}
+
+.rp-table tbody tr,
+#tabela tbody tr,
+#myTable tbody tr,
+.ifc-summary-table tbody tr,
+.tag-table tbody tr {
+    background: var(--rp-table-row);
+    transition: background var(--rp-transition-fast) var(--rp-motion-ease);
+}
+
+.rp-table tbody tr:nth-child(even),
+#tabela tbody tr:nth-child(even),
+#myTable tbody tr:nth-child(even),
+.ifc-summary-table tbody tr:nth-child(even),
+.tag-table tbody tr:nth-child(even) {
+    background: var(--rp-table-row-alt);
+}
+
+.rp-table tbody tr:hover,
+#tabela tbody tr:hover,
+#myTable tbody tr:hover,
+.ifc-summary-table tbody tr:hover,
+.tag-table tbody tr:hover {
+    background: var(--rp-table-hover);
+}
+
+.rp-table tbody td,
+#tabela td,
+#myTable tbody tr td,
+.ifc-summary-table td,
+.tag-table td {
+    color: var(--rp-table-text);
+    border-bottom: 1px solid var(--rp-table-border);
+}
+
+.rp-table tr.is-selected,
+#tabela tr.highlight,
+#myTable tr.highlight,
+.tag-table tr.highlight {
+    background: var(--rp-table-selected);
+}

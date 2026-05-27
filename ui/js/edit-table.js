@@ -52,7 +52,7 @@ function editHeaderCell(dataCell) {
       } else {
         dataCell.textContent = originalValue;
         dataCell.classList.remove("modified");
-        
+
       }
     } else {
       // Restore the original value and clean up
@@ -214,9 +214,9 @@ function editTag(dataCell) {
       listItem.className = "list";
       listItem.textContent = option;
       listItem.style.cursor = "pointer";
-  
+
       selectContainer.appendChild(listItem);
-      
+
       // Add click event to the list item to handle value change
       listItem.addEventListener("click", function () {
         selectContainer.value = option;
@@ -289,7 +289,7 @@ function editCustom(dataCell) {
   searchInput.style.textOverflow = "ellipsis";
   searchInput.style.setProperty("margin", "0", "important");
   searchInput.value = originalContent;
-  
+
   let selectContainer = document.createElement("div");
   selectContainer.className = "list-container";
 
@@ -308,16 +308,16 @@ function editCustom(dataCell) {
         option === "Summary" ||
         option === "Description" ||
         option === "Item Code"
-        ) {
+      ) {
         spanElement.className = "badge badge-pill badge-primary";
       } else {
         spanElement.className = "badge badge-pill badge-dark";
       };
-      
+
       listItem.appendChild(spanElement);
-  
+
       selectContainer.appendChild(listItem);
-      
+
       // Add click event to the list item to handle value change
       listItem.addEventListener("click", function () {
         selectContainer.value = option;
@@ -383,10 +383,10 @@ function editStatus(dataCell) {
   // Save current data
   let originalHtml = dataCell.innerHTML;
   let originalContent = dataCell.textContent;
-  
+
   // Add padding to the dataCell  
   dataCell.style.padding = "5px";
-  
+
   // Create an input element
   let searchInput = document.createElement("input");
   searchInput.type = "text";
@@ -396,10 +396,10 @@ function editStatus(dataCell) {
   searchInput.value = originalContent;
   let selectContainer = document.createElement("div");
   selectContainer.className = "list-container";
-  
+
   statusList = ["new", "existing", "reuse", "temporary", "demolition"];
   createStatusList(statusList);
-  
+
   function createStatusList(statusList) {
     statusList.forEach(function (option) {
       let listItem = document.createElement("div");
@@ -419,7 +419,7 @@ function editStatus(dataCell) {
       } else if (option === "demolition") {
         spanElement.className = "badge badge-danger";
       }
-      
+
       listItem.appendChild(spanElement);
       selectContainer.appendChild(listItem);
 
@@ -481,7 +481,7 @@ function editStatus(dataCell) {
   searchInput.addEventListener("mouseup", function (event) {
     event.preventDefault();
   });
-  
+
   // Focus on the select element
   selectContainer.focus();
 
@@ -493,7 +493,7 @@ function editStatus(dataCell) {
     if (!escKeyPressed) {
       const value = searchInput.value;
       dataCell.textContent = value;
-      if (value !== originalContent) {      
+      if (value !== originalContent) {
         dataCell.textContent = value;
         handleValueChanged(value);
       } else {
@@ -527,20 +527,20 @@ function editImage(dataCell) {
   let imgElement = dataCell.querySelector("img");
   let originalValue = imgElement.src;
   customLog("Orignal value: ", originalValue);
-  
+
   // Add padding to the dataCell
   dataCell.style.padding = "5px";
-  
+
   // Create an input element
   let inputElement = document.createElement("input");
   inputElement.className = "form-control mt-2";
   inputElement.type = "text";
   inputElement.placeholder = "Paste image link here";
   inputElement.value = originalValue;
-  
+
   // Add the input element into Cell
   dataCell.appendChild(inputElement);
-  
+
   // Focus on the input element
   inputElement.focus();
 
@@ -548,10 +548,10 @@ function editImage(dataCell) {
   inputElement.addEventListener("click", function () {
     inputElement.select();
   });
-  
+
   // Flag to check if ESC key was pressed
   let escKeyPressed = false;
-  
+
   // Function to handle changes and cleanup
   function finishEditing() {
     if (!escKeyPressed) {
@@ -559,7 +559,7 @@ function editImage(dataCell) {
       imgElement.src = value;
       dataCell.style.padding = "";
       inputElement.remove();
-      
+
       if (value !== originalValue) {
         imgElement.src = value;
         handleValueChanged(value);
@@ -571,18 +571,18 @@ function editImage(dataCell) {
       imgElement.src = originalValue;
       dataCell.style.padding = "";
       inputElement.remove();
-      
+
       // Wait for the image to load
-      imgElement.onload = function() {
+      imgElement.onload = function () {
         let imgHeight = imgElement.naturalHeight;
         let imgWidth = imgElement.naturalWidth;
         imgElement.height = 128;
         imgElement.width = (imgWidth / imgHeight) * imgElement.height;
-      };  
+      };
     }
-    
+
   }
-  
+
   // Back to original when ESC key press
   inputElement.addEventListener("keydown", function (event) {
     if (event.key === "Escape") {
@@ -590,7 +590,7 @@ function editImage(dataCell) {
       inputElement.blur(); // Trigger the 'blur' event
     }
   });
-  
+
   // Finish editing on 'blur' event
   inputElement.addEventListener("blur", function () {
     finishEditing();
@@ -610,9 +610,9 @@ function editSum(dataCell) {
   searchInput.value = originalContent;
   let selectContainer = document.createElement("div");
   selectContainer.className = "list-container";
-  
+
   createSumList(sumList);
-  
+
   function createSumList(sumList) {
     sumList.forEach(function (option) {
       let listItem = document.createElement("div");
@@ -620,9 +620,9 @@ function editSum(dataCell) {
       listItem.setAttribute("data-translate", option);
       listItem.textContent = option;
       listItem.style.cursor = "pointer";
-      
+
       selectContainer.appendChild(listItem);
-      
+
       // Add click event to the list item to handle value change
       listItem.addEventListener("click", function () {
         selectContainer.value = option;
@@ -632,7 +632,7 @@ function editSum(dataCell) {
       });
     });
   };
-  
+
   // Function to filter options based on search input value and show the select container
   function showSumList() {
     let searchTerm = searchInput.value.trim().toLowerCase();
@@ -644,19 +644,19 @@ function editSum(dataCell) {
     // Create list based on user search 
     createSumList(filteredOptions);
   }
-  
+
   // Add "input" event listener to the search input
   searchInput.addEventListener("input", function () {
     showSumList();
   });
-  
+
   // Clear current content of data cell
   dataCell.innerHTML = "";
   dataCell.style.padding = "5px";
   dataCell.appendChild(searchInput);
   dataCell.appendChild(selectContainer);
   selectContainer.style.width = searchInput.clientWidth;
-  
+
   // Function to handle global click event and close the select container
   function handleGlobalClick(event) {
     let clickedElement = event.target;
@@ -664,22 +664,22 @@ function editSum(dataCell) {
       clickedElement !== dataCell &&
       !dataCell.contains(clickedElement) &&
       clickedElement !== searchInput
-      ) {
-        document.removeEventListener("click", handleGlobalClick);
-        selectContainer.style.display = "none";
-        dataCell.innerHTML = originalHtml;
+    ) {
+      document.removeEventListener("click", handleGlobalClick);
+      selectContainer.style.display = "none";
+      dataCell.innerHTML = originalHtml;
       dataCell.style.padding = "";
     }
   }
-  
+
   // Attach a one-time click event listener to the document
   document.addEventListener("click", handleGlobalClick);
-  
+
   // Prevent the click event from bubbling up to the document
   searchInput.addEventListener("click", function (event) {
     event.stopPropagation();
   });
-  
+
   // Prevent the document click event from being triggered immediately
   searchInput.addEventListener("mouseup", function (event) {
     event.preventDefault();
@@ -696,7 +696,7 @@ function editSum(dataCell) {
     if (!escKeyPressed) {
       const value = searchInput.value;
       dataCell.textContent = value;
-      if (value !== originalContent) {      
+      if (value !== originalContent) {
         dataCell.textContent = value;
         // handleValueChanged(value);
       } else {
@@ -763,7 +763,7 @@ document.addEventListener('dblclick', function (event) {
           key === "url" ||
           key === "owner" ||
           key === "status"
-          )) {
+        )) {
           $("#noticeGCModal").modal("show");
         } else if (
           key.includes("ordinal") ||
@@ -775,28 +775,28 @@ document.addEventListener('dblclick', function (event) {
           key.includes("quantity") ||
           key.includes("total") ||
           key.includes("custom")
-          ) {
+        ) {
           $("#noticeEditableModal").modal("show");
         } else {
           if (
-          key === "definition" ||
-          key === "price" ||
-          key === "size" ||
-          key === "url"
+            key === "definition" ||
+            key === "price" ||
+            key === "size" ||
+            key === "url"
           ) {
             editCell(cell);
           } else if (
             key === "instance" ||
             key === "description" ||
             key === "owner"
-            ) {
-              editTextArea(cell);
-            } else if (key === "tag") {
-              editTag(cell);
-            } else if (key === "image") {
-              editImage(cell);
-            } else if (key === "status") {
-              editStatus(cell);
+          ) {
+            editTextArea(cell);
+          } else if (key === "tag") {
+            editTag(cell);
+          } else if (key === "image") {
+            editImage(cell);
+          } else if (key === "status") {
+            editStatus(cell);
           };
         }
       }
@@ -806,13 +806,13 @@ document.addEventListener('dblclick', function (event) {
 
 function getObjectID(cell) {
   cell_info = cell.id.split("-");
-  
+
   object_id = cell_info[0];
   // customLog("1a. (Edit Cell) Object ID: ", object_id);
-  
+
   object_type = cell_info[1];
   // customLog("1b. (Edit Cell) Object ID: ",  object_type);
-  
+
   key = cell_info[2];
   // customLog("1c. (Edit Cell) Column key: ", key)
 }
@@ -826,43 +826,43 @@ function sortDataByColumn(sortColumn, sortOrder) {
   if (window.relatorioGroupedMode) { return; }
   let decimalSeparator = localStorage.getItem('decimalSeparator') || '.';
   let thousandSeparator = localStorage.getItem('thousandSeparator') || ',';
-  
+
   let table = document.getElementById("myTable");
   let tbody = table.querySelector("tbody");
   let rows = Array.from(tbody.getElementsByTagName("tr"));
   let textA;
   let textB;
-  
+
   // Get data from clicked column
   let sortedRows = rows.sort(function (a, b) {
     let cellA = a.querySelector(`td[id$="-${sortColumn}"]`);
     let cellB = b.querySelector(`td[id$="-${sortColumn}"]`);
-    
+
     if (sortColumn.includes("len") || sortColumn.includes("area") || sortColumn.includes("volume")) {
       textA = removeThousandSeparator(cellA.textContent || cellA.innerText, thousandSeparator);
       textB = removeThousandSeparator(cellB.textContent || cellB.innerText, thousandSeparator);
     } else {
       textA = cellA.textContent || cellA.innerText;
       textB = cellB.textContent || cellB.innerText;
-    }    
-    
+    }
+
     // Order based on sortOrder
     let compareResult = textA.localeCompare(textB, undefined, { numeric: true });
     return compareResult * sortOrder;
   });
-  
+
   function removeThousandSeparator(numberString, thousandSeparator) {
     return numberString.replace(new RegExp(`\\${thousandSeparator}`, 'g'), '');
   }
-  
+
   localStorage.setItem("sortOrderSaved", sortOrder);
   customLog("2. (Sort) Sort order saved: ", sortOrder);
-  
+
   // Remove old rows
   while (tbody.firstChild) {
     tbody.removeChild(tbody.firstChild);
   }
-  
+
   // Add sorted rows to table body
   sortedRows.forEach(function (row) {
     tbody.appendChild(row);
@@ -897,12 +897,12 @@ function performSearch() {
   let table = document.getElementById("myTable");
   let rows = table.getElementsByTagName("tr");
   let originalContent;
-  
+
   for (let i = 2; i < rows.length; i++) { // i = 2 => (from row index 2)
     let row = rows[i];
-  let cells = row.getElementsByTagName("td");
-  let rowVisible = false;
-  
+    let cells = row.getElementsByTagName("td");
+    let rowVisible = false;
+
     for (let j = 1; j < cells.length; j++) { // j = 1 (from row index 1)
       let cell = cells[j];
       getObjectID(cell);
@@ -916,11 +916,11 @@ function performSearch() {
 
           // Save original content
           originalContent = cellText;
-  
+
           // Check if the cell text contains the search input
           if (cellText.includes(findInput)) {
             rowVisible = true;
-  
+
             // Highlight matching words in the cell
             let regex = new RegExp("(" + escapeRegExp(findInput) + ")", "gi");
             cellText = cellText.replace(regex, "<span class='search-highlight'>$1</span>");
@@ -949,6 +949,9 @@ function escapeRegExp(string) {
 }
 
 document.getElementById("findInput").addEventListener("keyup", function () {
+  if (typeof window.setLayoutView === 'function') {
+    window.setLayoutView('table');
+  }
   performSearch();
 });
 
@@ -958,6 +961,9 @@ let clearIcon = document.getElementById("clearIcon");
 let replaceBox = document.getElementById("replaceBox");
 
 findInput.addEventListener("input", function () {
+  if (typeof window.setLayoutView === 'function') {
+    window.setLayoutView('table');
+  }
   performSearch();
   toggleClearIcon(); // Toggle the clear icon based on input value
 });
@@ -986,7 +992,7 @@ function performReplace() {
   let replaceInput = document.getElementById("replaceInput").value;
   let table = document.getElementById("myTable");
   let rows = table.getElementsByTagName("tr");
-  
+
   for (let i = 2; i < rows.length; i++) {
     let row = rows[i];
     let cells = row.getElementsByTagName("td");
@@ -997,11 +1003,11 @@ function performReplace() {
       for (let j = 0; j < cells.length; j++) {
         let cell = cells[j];
         getObjectID(cell);
-  
+
         // Only action if the cell is not belong to Hidden column
         if (cell.style.display !== "none") {
           let cellText = cell.textContent;
-          
+
           // Check if the cell text contains the search input
           if (cellText.includes(findInput)) {
             // Replace the search input with the replace input
@@ -1016,18 +1022,18 @@ function performReplace() {
               key === "url" ||
               key === "owner" ||
               key === "status"
-              ) {
+            ) {
               customLog("Data Column replaced: ", key);
               customLog("ID Cell replaced: ", object_id);
               handleValueChanged(replacedText);
               rowVisible = true;
             }
           }
-          
+
         }
       }
     }
-    
+
     if (rowVisible) {
       row.style.display = "";
     } else {
@@ -1077,36 +1083,36 @@ function groupRows() {
   let table = document.getElementById('myTable');
   let rows = table.getElementsByTagName('tr');
   let groupedRows = {};
-  
+
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     // Skip rows with id = "extraRow"
     if (row.id === "extra") {
       continue;
     }
-    
+
     const cells = row.getElementsByTagName('td');
     let key = '';
-    
+
     for (let j = 1; j < cells.length - 1; j++) {
       key += cells[j].innerText;
     }
-    
+
     if (!groupedRows[key]) {
       groupedRows[key] = { count: 0, rows: [] };
     }
-    
+
     groupedRows[key].count++;
     groupedRows[key].rows.push(row);
   }
-  
+
   // Hide existing rows (except the first row in each group)
   for (const key in groupedRows) {
     const rowsToHide = groupedRows[key].rows.slice(1);
     rowsToHide.forEach(row => {
       row.style.display = "none";
     });
-    
+
     // Update value for the last cell in the first row of the group
     const firstRow = groupedRows[key].rows[0];
     const allCells = firstRow.getElementsByTagName('td');
@@ -1132,7 +1138,7 @@ function updateIndex() {
     }
     return true;
   });
-  
+
   visibleRows.forEach((row, index) => {
     const cells = row.getElementsByTagName("td");
     if (ordinalColumnIndex !== -1 && cells.length > ordinalColumnIndex) {

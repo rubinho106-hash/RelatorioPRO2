@@ -382,8 +382,34 @@ const RenderManager = (() => {
       btnTag.className = state.mode === 'TAG' ? 'dashboard-nav-btn active' : 'dashboard-nav-btn';
     }
 
+    _syncLayoutModeClass(state);
+
     // Atualizar menu (sidebar)
     _renderMenu(state);
+  };
+
+  const _syncLayoutModeClass = (state) => {
+    const body = document.body;
+    if (!body || !state) return;
+
+    if (typeof LayoutState !== 'undefined' && typeof LayoutState.applyBodyClass === 'function') {
+      LayoutState.applyBodyClass(state.mode);
+      return;
+    }
+
+    body.classList.remove('layout-dashboard', 'layout-tag', 'layout-element', 'layout-table');
+
+    if (state.mode === 'ELEMENT') {
+      body.classList.add('layout-element');
+      return;
+    }
+
+    if (state.mode === 'TAG') {
+      body.classList.add('layout-tag');
+      return;
+    }
+
+    body.classList.add('layout-dashboard');
   };
 
   // =========================================================================
@@ -545,6 +571,18 @@ const RenderManager = (() => {
       const volume = Number(tagData.volume || 0);
       const icon = _getTagIcon(tag);
 
+      const canShowMl = !window.BIMDataView || !window.BIMDataView.isFieldVisible ||
+        window.BIMDataView.isFieldVisible(['comprimento', 'metro_linear_total', 'metro_linear', 'len_x', 'len_y', 'len_z', 'len_xy', 'len_xz', 'len_xyz']);
+      const canShowArea = !window.BIMDataView || !window.BIMDataView.isFieldVisible ||
+        window.BIMDataView.isFieldVisible(['area', 'area_total', 'area_xy', 'area_xz']);
+      const canShowVolume = !window.BIMDataView || !window.BIMDataView.isFieldVisible ||
+        window.BIMDataView.isFieldVisible(['volume', 'volume_total']);
+
+      const metrics = [];
+      if (canShowMl) { metrics.push('<strong>' + metroLinear.toFixed(2) + '</strong> m'); }
+      if (canShowArea) { metrics.push('<strong>' + area.toFixed(2) + '</strong> m²'); }
+      if (canShowVolume) { metrics.push('<strong>' + volume.toFixed(2) + '</strong> m³'); }
+
       html +=
         '<div class="summary-card" style="cursor: pointer;" onclick="AppState.setCurrentTag(\'' + tag.replace(/'/g, "\\'") + '\');RenderManager.renderAll();">' +
         '<h4 style="display: flex; align-items: center; gap: 8px;">' +
@@ -552,7 +590,7 @@ const RenderManager = (() => {
         '<span>' + tag + '</span>' +
         '</h4>' +
         '<p><strong>' + totalElementos + '</strong> elementos</p>' +
-        '<p style="font-size: 11px; color: #666;"><strong>' + metroLinear.toFixed(2) + '</strong> m | <strong>' + area.toFixed(2) + '</strong> m²</p>' +
+        '<p style="font-size: 11px; color: #666;">' + (metrics.length > 0 ? metrics.join(' | ') : 'Sem métricas visíveis') + '</p>' +
         '</div>';
     });
 

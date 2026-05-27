@@ -48,11 +48,11 @@ const SidebarModule = (() => {
     globalItem.className = 'menu-item' + (isGlobalActive ? ' active' : '');
     globalItem.innerHTML =
       '<div class="menu-item-main">' +
-        '<span class="menu-item-icon">🌐</span>' +
-        '<span class="menu-item-text">' +
-          '<strong>GLOBAL</strong>' +
-          '<small>' + globalTotal + ' elementos</small>' +
-        '</span>' +
+      '<span class="menu-item-icon">' + _getIconSvg('global') + '</span>' +
+      '<span class="menu-item-text">' +
+      '<strong>GLOBAL</strong>' +
+      '<small>' + globalTotal + ' elementos</small>' +
+      '</span>' +
       '</div>' +
       '<span class="menu-item-badge">' + globalTotal + '</span>';
     globalItem.style.cursor = 'pointer';
@@ -101,11 +101,11 @@ const SidebarModule = (() => {
     div.className = 'menu-item' + (isActive ? ' active' : '');
     div.innerHTML =
       '<div class="menu-item-main">' +
-        '<span class="menu-item-icon">' + icon + '</span>' +
-        '<span class="menu-item-text">' +
-          '<strong>' + _escapeHtml(tag) + '</strong>' +
-          '<small>' + countLabel + '</small>' +
-        '</span>' +
+      '<span class="menu-item-icon">' + icon + '</span>' +
+      '<span class="menu-item-text">' +
+      '<strong>' + _escapeHtml(tag) + '</strong>' +
+      '<small>' + countLabel + '</small>' +
+      '</span>' +
       '</div>' +
       '<span class="menu-item-badge">' + totalElementos + '</span>';
     div.style.cursor = 'pointer';
@@ -144,16 +144,37 @@ const SidebarModule = (() => {
   };
 
   const _getTagIcon = (tag) => {
-    if (!tag) { return '📦'; }
+    if (!tag) { return _getIconSvg('box'); }
     const tagUpper = String(tag).toUpperCase();
-    if (tagUpper.includes('VIGAS') || tagUpper.includes('VIGA')) { return '➖'; }
-    if (tagUpper.includes('PILARES') || tagUpper.includes('PILAR')) { return '📟'; }
-    if (tagUpper.includes('LAJES') || tagUpper.includes('LAJE')) { return '📘'; }
-    if (tagUpper.includes('PAREDES') || tagUpper.includes('PAREDE')) { return '🟫'; }
-    if (tagUpper.includes('ESCADAS') || tagUpper.includes('ESCADA')) { return '🪜'; }
-    if (tagUpper.includes('PORTAS') || tagUpper.includes('PORTA')) { return '🚪'; }
-    if (tagUpper.includes('JANELAS') || tagUpper.includes('JANELA')) { return '🪟'; }
-    return '🏷️';
+    if (tagUpper.includes('VIGAS') || tagUpper.includes('VIGA')) { return _getIconSvg('beam'); }
+    if (tagUpper.includes('PILARES') || tagUpper.includes('PILAR')) { return _getIconSvg('column'); }
+    if (tagUpper.includes('LAJES') || tagUpper.includes('LAJE')) { return _getIconSvg('slab'); }
+    if (tagUpper.includes('PAREDES') || tagUpper.includes('PAREDE')) { return _getIconSvg('wall'); }
+    if (tagUpper.includes('ESCADAS') || tagUpper.includes('ESCADA')) { return _getIconSvg('stairs'); }
+    if (tagUpper.includes('PORTAS') || tagUpper.includes('PORTA')) { return _getIconSvg('door'); }
+    if (tagUpper.includes('JANELAS') || tagUpper.includes('JANELA')) { return _getIconSvg('window'); }
+    return _getIconSvg('tag');
+  };
+
+  const _getIconSvg = (name) => {
+    const baseStart = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+    const baseEnd = '</svg>';
+
+    const icons = {
+      global: '<circle cx="12" cy="12" r="9"></circle><path d="M3.8 9h16.4"></path><path d="M3.8 15h16.4"></path><path d="M12 3c2.8 2.6 2.8 14.4 0 18"></path><path d="M12 3c-2.8 2.6-2.8 14.4 0 18"></path>',
+      beam: '<path d="M4 9h16"></path><path d="M5 7v4"></path><path d="M19 7v4"></path><path d="M4 15h16"></path>',
+      column: '<rect x="8" y="4" width="8" height="16" rx="1.8"></rect><path d="M6 4h12"></path><path d="M6 20h12"></path>',
+      slab: '<path d="M4 8h16v8H4z"></path><path d="M4 10h16"></path><path d="M4 14h16"></path>',
+      wall: '<path d="M5 6h14v12H5z"></path><path d="M8 6v12"></path><path d="M12 6v12"></path><path d="M16 6v12"></path>',
+      stairs: '<path d="M5 19h14"></path><path d="M5 19v-3h3v-3h3v-3h3V7h2"></path>',
+      door: '<path d="M7 4h10v16H7z"></path><path d="M11 12h.01"></path>',
+      window: '<rect x="5" y="5" width="14" height="14" rx="1"></rect><path d="M5 12h14"></path><path d="M12 5v14"></path>',
+      tag: '<path d="M20 12l-8 8-8-8V5h7z"></path><circle cx="9" cy="9" r="1.4"></circle>',
+      box: '<path d="M4 8l8-4 8 4-8 4z"></path><path d="M4 8v8l8 4 8-4V8"></path><path d="M12 12v8"></path>'
+    };
+
+    const glyph = icons[name] || icons.tag;
+    return baseStart + glyph + baseEnd;
   };
 
   const _escapeHtml = (text) => {

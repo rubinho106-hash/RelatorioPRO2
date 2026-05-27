@@ -8,19 +8,66 @@ let columnOrder;
 let checkboxStates;
 
 const defaultCheckboxStates = {
-  ordinal: false, image: false, entity: false, definition: false,
-  instance: true, description: false,
-  material: false, storey: true,
-  tipo: true, secao: true, comprimento: true,
-  quantidade: true, metro_linear_total: true, area_total: true, volume_total: true,
-  instancias: false,
-  len_x: false, len_y: false, len_z: false,
-  len_xz: false, len_xy: false, len_xyz: true,
-  area_xz: false, area_xy: false, area: true, volume: true,
-  ifc: false, tag: true, status: false, owner: false,
-  url: false, size: false, price: false, custom: false,
-  quantity: true, total: false
+  ordinal: false,
+  image: false,
+  entity: false,
+  definition: false,
+  instance: true,
+  description: false,
+  len_x: false,
+  len_y: false,
+  len_z: false,
+  len_xz: false,
+  len_xy: false,
+  len_xyz: false,
+  area_xz: false,
+  area_xy: false,
+  area: true,
+  area_total: false,
+  volume: true,
+  ifc: false,
+  tag: true,
+  material: false,
+  status: false,
+  owner: false,
+  url: false,
+  size: false,
+  price: false,
+  custom: false,
+  quantity: true,
+  total: false
 };
+
+const REQUIRED_BIM_FIELD_KEYS = [
+  'ordinal',
+  'image',
+  'entity',
+  'definition',
+  'instance',
+  'description',
+  'len_x',
+  'len_y',
+  'len_z',
+  'len_xz',
+  'len_xy',
+  'len_xyz',
+  'area_xz',
+  'area_xy',
+  'area',
+  'area_total',
+  'volume',
+  'ifc',
+  'tag',
+  'material',
+  'status',
+  'owner',
+  'url',
+  'size',
+  'price',
+  'custom',
+  'quantity',
+  'total'
+];
 
 // Estado compartilhado entre funções deste arquivo
 let objects = [];
@@ -56,6 +103,12 @@ let outboundTagSelectionLockUntil = 0;
 let dashboardSelectionPulseTimer = null;
 let pendingSelectionClearTimer = null;
 const SELECTION_CLEAR_GRACE_MS = 220;
+const COLUMN_PANEL_SIZE_KEY = 'columnPanelSize';
+const COLUMN_PANEL_WIDTH_KEY = 'columnPanelWidthPx';
+const COLUMN_PANEL_COLLAPSED_KEY = 'columnPanelCollapsed';
+const COLUMN_PANEL_SIZE_OPTIONS = ['compact', 'normal', 'wide', 'custom'];
+const COLUMN_PANEL_MIN_WIDTH = 320;
+const COLUMN_PANEL_MAX_WIDTH = 680;
 const DEFAULT_TAG_IFC_RULES = {
   VIGA: ['IFCBEAM'],
   PILAR: ['IFCCOLUMN'],
@@ -86,17 +139,302 @@ let sumCacheReady = false;
 // Nomes personalizados de colunas salvos pelo usuário
 const USER_LABEL_KEYS = [
   'ordinal', 'image', 'entity', 'definition', 'instance', 'description',
-  'material', 'storey',
-  'tipo', 'secao', 'comprimento', 'quantidade', 'metro_linear_total', 'area_total', 'volume_total', 'instancias',
   'len_x', 'len_y', 'len_z', 'len_xz', 'len_xy', 'len_xyz',
-  'area_xz', 'area_xy', 'area', 'volume', 'ifc', 'tag',
-  'status', 'owner', 'url', 'size', 'price', 'quantity', 'total', 'custom'
+  'area_xz', 'area_xy', 'area', 'area_total', 'volume',
+  'ifc', 'tag', 'material', 'status', 'owner', 'url',
+  'size', 'price', 'custom', 'quantity', 'total'
 ];
 let userLabels = {};   // { key: 'Nome customizado' }
 
 customLog('(*) DATA PREPARED');
 
+function setLayoutView(viewName) {
+  'use strict';
+  const desired = viewName === 'table' ? 'table' : 'dashboard';
+
+  if (typeof ViewRegistry !== 'undefined' && typeof ViewRegistry.setActive === 'function') {
+    ViewRegistry.setActive(desired);
+  }
+
+  if (typeof LayoutState !== 'undefined' && typeof LayoutState.setView === 'function') {
+    LayoutState.setView(desired);
+    const navMode = (typeof AppState !== 'undefined' && AppState.getMode) ? AppState.getMode() : 'GLOBAL';
+    if (typeof LayoutState.applyBodyClass === 'function') {
+      LayoutState.applyBodyClass(navMode);
+    }
+    return;
+  }
+
+  const body = document.body;
+  if (!body) { return; }
+  body.classList.remove('layout-dashboard', 'layout-tag', 'layout-element', 'layout-table');
+  body.classList.add(desired === 'table' ? 'layout-table' : 'layout-dashboard');
+}
+
+window.setLayoutView = setLayoutView;
+
+function getSavedColumnPanelSize() {
+  'use strict';
+  const raw = String(localStorage.getItem(COLUMN_PANEL_SIZE_KEY) || 'normal').toLowerCase();
+  return COLUMN_PANEL_SIZE_OPTIONS.indexOf(raw) >= 0 ? raw : 'normal';
+}
+
+function clampColumnPanelWidth(widthPx) {
+  'use strict';
+  const viewportLimit = Math.max(COLUMN_PANEL_MIN_WIDTH, Math.floor(window.innerWidth - 24));
+  const maxAllowed = Math.min(COLUMN_PANEL_MAX_WIDTH, viewportLimit);
+  const value = Number(widthPx);
+  if (!Number.isFinite(value)) { return Math.min(420, maxAllowed); }
+  return Math.max(COLUMN_PANEL_MIN_WIDTH, Math.min(maxAllowed, Math.round(value)));
+}
+
+function getSavedColumnPanelWidth() {
+  'use strict';
+  return clampColumnPanelWidth(localStorage.getItem(COLUMN_PANEL_WIDTH_KEY));
+}
+
+function applyColumnPanelWidth(widthPx) {
+  'use strict';
+  const panel = document.getElementById('col-panel');
+  if (!panel) { return; }
+  const safeWidth = clampColumnPanelWidth(widthPx);
+  panel.setAttribute('data-size', 'custom');
+  panel.style.setProperty('--rp-col-panel-width', safeWidth + 'px');
+  panel.style.setProperty('--rp-col-panel-max-width', safeWidth + 'px');
+}
+
+function applyColumnPanelSize(size) {
+  'use strict';
+  const panel = document.getElementById('col-panel');
+  if (!panel) { return; }
+  const safeSize = COLUMN_PANEL_SIZE_OPTIONS.indexOf(String(size || '').toLowerCase()) >= 0
+    ? String(size).toLowerCase()
+    : 'normal';
+
+  if (safeSize === 'custom') {
+    applyColumnPanelWidth(getSavedColumnPanelWidth());
+    return;
+  }
+
+  panel.style.removeProperty('--rp-col-panel-width');
+  panel.style.removeProperty('--rp-col-panel-max-width');
+  panel.setAttribute('data-size', safeSize);
+}
+
+function isMobilePanelViewport() {
+  'use strict';
+  return !!(window.matchMedia && window.matchMedia('(max-width: 720px)').matches);
+}
+
+function getSavedColumnPanelCollapsed() {
+  'use strict';
+  return localStorage.getItem(COLUMN_PANEL_COLLAPSED_KEY) === '1';
+}
+
+function applyColumnPanelCollapsed(collapsed) {
+  'use strict';
+  const panel = document.getElementById('col-panel');
+  const toggle = document.getElementById('bimPanelToggle');
+  const content = document.querySelector('.content.has-fixed-bim-panel');
+  if (!panel || !toggle || !content) { return; }
+
+  const safeCollapsed = isMobilePanelViewport() ? false : !!collapsed;
+  panel.classList.toggle('is-collapsed', safeCollapsed);
+  content.classList.toggle('bim-panel-collapsed', safeCollapsed);
+  toggle.setAttribute('aria-expanded', safeCollapsed ? 'false' : 'true');
+  toggle.setAttribute('aria-label', safeCollapsed ? 'Expandir painel Campos BIM' : 'Ocultar painel Campos BIM');
+  toggle.textContent = safeCollapsed ? '<' : '>';
+}
+
+function initializeColumnPanelToggle() {
+  'use strict';
+  const toggle = document.getElementById('bimPanelToggle');
+  const panel = document.getElementById('col-panel');
+  if (!toggle || !panel) { return; }
+  if (toggle.dataset.bound === '1') { return; }
+  toggle.dataset.bound = '1';
+
+  applyColumnPanelCollapsed(getSavedColumnPanelCollapsed());
+
+  toggle.addEventListener('click', function () {
+    const isCollapsed = panel.classList.contains('is-collapsed');
+    const next = !isCollapsed;
+    localStorage.setItem(COLUMN_PANEL_COLLAPSED_KEY, next ? '1' : '0');
+    applyColumnPanelCollapsed(next);
+  });
+
+  window.addEventListener('resize', function () {
+    applyColumnPanelCollapsed(getSavedColumnPanelCollapsed());
+  });
+}
+
+function initializeColumnPanelResizer(sizeSelectEl) {
+  'use strict';
+  const panel = document.getElementById('col-panel');
+  if (!panel) { return; }
+
+  let handle = panel.querySelector('.column-panel-resize-handle');
+  if (!handle) {
+    handle = document.createElement('button');
+    handle.type = 'button';
+    handle.className = 'column-panel-resize-handle';
+    handle.setAttribute('aria-label', 'Redimensionar painel');
+    panel.appendChild(handle);
+  }
+
+  handle._sizeSelect = sizeSelectEl || handle._sizeSelect || null;
+  if (handle.dataset.bound === '1') { return; }
+
+  handle.dataset.bound = '1';
+
+  handle.addEventListener('mousedown', function (event) {
+    if (window.matchMedia && window.matchMedia('(max-width: 720px)').matches) { return; }
+    event.preventDefault();
+
+    const startX = event.clientX;
+    const startWidth = panel.getBoundingClientRect().width;
+
+    const onMouseMove = function (moveEvent) {
+      const nextWidth = clampColumnPanelWidth(startWidth + (moveEvent.clientX - startX));
+      applyColumnPanelWidth(nextWidth);
+      localStorage.setItem(COLUMN_PANEL_SIZE_KEY, 'custom');
+      localStorage.setItem(COLUMN_PANEL_WIDTH_KEY, String(nextWidth));
+      if (handle._sizeSelect) {
+        handle._sizeSelect.value = 'custom';
+      }
+    };
+
+    const onMouseUp = function () {
+      document.body.classList.remove('is-resizing-column-panel');
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.body.classList.add('is-resizing-column-panel');
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  });
+}
+
+function _normalizeFieldKey(raw) {
+  'use strict';
+  return String(raw || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '_')
+    .trim();
+}
+
+function getCanonicalBimFieldKeys() {
+  'use strict';
+  return REQUIRED_BIM_FIELD_KEYS.slice();
+}
+
+function getSanitizedColumnOrder(columns) {
+  'use strict';
+  const savedOrder = localStorage.getItem('columnOrder');
+  const maxIndex = columns.length - 1;
+
+  if (!savedOrder || savedOrder === 'none') {
+    return columns.map(function (_, i) { return i; });
+  }
+
+  const parsed = savedOrder
+    .split(',')
+    .map(function (value) { return parseInt(value, 10); })
+    .filter(function (value) { return Number.isInteger(value) && value >= 0 && value <= maxIndex; });
+
+  const seen = new Set();
+  const sanitized = [];
+  parsed.forEach(function (index) {
+    if (seen.has(index)) { return; }
+    seen.add(index);
+    sanitized.push(index);
+  });
+
+  columns.forEach(function (_, index) {
+    if (!seen.has(index)) {
+      sanitized.push(index);
+    }
+  });
+
+  return sanitized;
+}
+
+function getVisibleColumnKeys() {
+  'use strict';
+  if (!checkboxStates || typeof checkboxStates !== 'object') { return []; }
+  const allowed = new Set(getCanonicalBimFieldKeys());
+  return Object.keys(checkboxStates).filter(function (k) {
+    return allowed.has(k) && checkboxStates[k] === true;
+  });
+}
+
+function isFieldVisible(fieldKeys) {
+  'use strict';
+  const keys = Array.isArray(fieldKeys) ? fieldKeys : [fieldKeys];
+  if (keys.length === 0) { return true; }
+
+  const visible = getVisibleColumnKeys().map(_normalizeFieldKey);
+  if (visible.length === 0) { return true; }
+
+  return keys.some(function (k) {
+    const normalized = _normalizeFieldKey(k);
+    if (!normalized) { return false; }
+
+    if (visible.indexOf(normalized) >= 0) { return true; }
+
+    // Alias rules for metric families.
+    if (normalized === 'metro_linear') {
+      return visible.some(function (v) {
+        return v.indexOf('metro_linear') >= 0 || v.indexOf('comprimento') >= 0 || v.indexOf('len_') === 0;
+      });
+    }
+
+    if (normalized === 'area') {
+      return visible.some(function (v) { return v.indexOf('area') >= 0; });
+    }
+
+    if (normalized === 'volume') {
+      return visible.some(function (v) { return v.indexOf('volume') >= 0; });
+    }
+
+    return false;
+  });
+}
+
+function notifyDataViewChanged() {
+  'use strict';
+  const payload = { visibleColumns: getVisibleColumnKeys() };
+
+  if (typeof EventBus !== 'undefined' && EventBus.emit) {
+    EventBus.emit('DATA_VIEW_SCHEMA_CHANGED', payload);
+  }
+
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent('relatoriopro:visible-columns-changed', { detail: payload }));
+  }
+
+  if (typeof RenderManager !== 'undefined' && RenderManager.renderAll) {
+    RenderManager.renderAll();
+  }
+}
+
+window.BIMDataView = {
+  getVisibleColumns: getVisibleColumnKeys,
+  isFieldVisible: isFieldVisible,
+  notifyChanged: notifyDataViewChanged
+};
+
 document.addEventListener('DOMContentLoaded', function () {
+  if (typeof ViewRegistry !== 'undefined' && typeof ViewRegistry.register === 'function') {
+    ViewRegistry.register('dashboard', { rootId: 'dashboardContainer' });
+    ViewRegistry.register('table', { rootId: 'tableContainer' });
+  }
+
+  setLayoutView('dashboard');
+
   // Carrega estados salvos sem globals implícitas
   checkboxStates = JSON.parse(localStorage.getItem('checkboxStates')) || Object.assign({}, defaultCheckboxStates);
   sortColumn = localStorage.getItem('sortColumnSaved') || 'ordinal';
@@ -104,6 +442,8 @@ document.addEventListener('DOMContentLoaded', function () {
   thousandSeparator = localStorage.getItem('thousandSeparator') || ',';
   currency = localStorage.getItem('currency') || 'USD';
   sumKey = localStorage.getItem('sumKey') || 'None';
+  applyColumnPanelSize(getSavedColumnPanelSize());
+  initializeColumnPanelToggle();
 
   // Carrega labels personalizados do usuário
   USER_LABEL_KEYS.forEach(function (k) {
@@ -206,6 +546,7 @@ function _initializeEventDrivenArchitecture() {
 
   // Escutar mudanças de navegação no AppState
   EventBus.on(EventBus.Events.NAVIGATION_MODE_CHANGED, function (data) {
+    setLayoutView('dashboard');
     _syncStateProxies();
     if (typeof RenderManager !== 'undefined' && RenderManager.renderAll) {
       RenderManager.renderAll();
@@ -213,14 +554,17 @@ function _initializeEventDrivenArchitecture() {
   });
 
   EventBus.on(EventBus.Events.TAG_SELECTED, function (data) {
+    setLayoutView('dashboard');
     _syncStateProxies();
 
     const selectedTag = String((data && data.tag) || (typeof AppState !== 'undefined' && AppState.getCurrentTag ? AppState.getCurrentTag() : '') || '').trim();
     if (selectedTag && typeof Bridge !== 'undefined' && typeof Bridge.selectTagEntities === 'function') {
       const zoomToggle = document.getElementById('zoomToggle');
       const shouldFocus = !!(zoomToggle && zoomToggle.checked);
+      const isolateToggle = document.getElementById('isolateTagToggle');
+      const shouldIsolate = !!(isolateToggle && isolateToggle.checked);
       outboundTagSelectionLockUntil = Date.now() + 700;
-      Bridge.selectTagEntities(selectedTag, { focus: shouldFocus });
+      Bridge.selectTagEntities(selectedTag, { focus: shouldFocus, isolate: shouldIsolate });
     }
 
     if (typeof RenderManager !== 'undefined' && RenderManager.renderAll) {
@@ -229,6 +573,7 @@ function _initializeEventDrivenArchitecture() {
   });
 
   EventBus.on(EventBus.Events.ELEMENT_SELECTED, function (data) {
+    setLayoutView('dashboard');
     _syncStateProxies();
     if (typeof RenderManager !== 'undefined' && RenderManager.renderAll) {
       RenderManager.renderAll();
@@ -243,7 +588,13 @@ function _initializeEventDrivenArchitecture() {
   });
 
   EventBus.on(EventBus.Events.BACK_TO_GLOBAL, function (data) {
+    setLayoutView('dashboard');
     _syncStateProxies();
+
+    if (typeof Bridge !== 'undefined' && typeof Bridge.clearTagIsolation === 'function') {
+      Bridge.clearTagIsolation();
+    }
+
     carregarPavimentos(null);
     if (typeof RenderManager !== 'undefined' && RenderManager.renderAll) {
       RenderManager.renderAll();
@@ -251,6 +602,7 @@ function _initializeEventDrivenArchitecture() {
   });
 
   EventBus.on(EventBus.Events.BACK_TO_TAG, function (data) {
+    setLayoutView('dashboard');
     _syncStateProxies();
     const tag = AppState.getCurrentTag();
     if (tag) {
@@ -346,6 +698,11 @@ function buildDynamicSchemaMap(dynamicSchema) {
     if (!key) { return; }
     map[key] = item;
   });
+
+  if (typeof BIMSchemaRegistry !== 'undefined' && BIMSchemaRegistry.mergeDynamicSchema) {
+    BIMSchemaRegistry.mergeDynamicSchema(map);
+  }
+
   return map;
 }
 
@@ -355,12 +712,26 @@ function getColumnDisplayLabel(key) {
   if (!k) { return ''; }
   if (userLabels[k]) { return userLabels[k]; }
 
+  if (typeof BIMSchemaRegistry !== 'undefined' && BIMSchemaRegistry.getField) {
+    const field = BIMSchemaRegistry.getField(k);
+    if (field && field.label) {
+      return String(field.label);
+    }
+  }
+
   const schema = dynamicSchemaByKey[k];
   if (schema && schema.label) {
     return String(schema.label);
   }
 
-  return k;
+  if (window.languageData && Object.prototype.hasOwnProperty.call(window.languageData, k)) {
+    return String(window.languageData[k]);
+  }
+
+  // Fallback legível para chaves técnicas sem tradução.
+  return k
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, function (char) { return char.toUpperCase(); });
 }
 
 function captureDashboardUIState() {
@@ -604,7 +975,7 @@ function updateData(data, saved_settings, layer_list, dynamic_list, custom_keys,
   if (!data || data.length === 0) {
     resetIncrementalMaps();
     if (dashboard) {
-      dashboard.innerHTML = '<div style="padding:32px; color:#7d8088; font-size:14px;">Nenhum elemento selecionado no modelo.</div>';
+      dashboard.innerHTML = '<div class="rp-empty-state-lg">Nenhum elemento selecionado no modelo.</div>';
     }
     if (container) { container.innerHTML = ''; }
     return;
@@ -623,14 +994,8 @@ function updateData(data, saved_settings, layer_list, dynamic_list, custom_keys,
   const headerRow = document.createElement('tr');
   headerRow.id = 'header-row';
 
-  const columns = Object.keys(data[0]).slice(1); // remove 'id'
-
-  const savedOrder = localStorage.getItem('columnOrder');
-  if (!savedOrder || savedOrder === 'none') {
-    columnOrder = columns.map(function (_, i) { return i; });
-  } else {
-    columnOrder = savedOrder.split(',');
-  }
+  const columns = getCanonicalBimFieldKeys();
+  columnOrder = getSanitizedColumnOrder(columns);
 
   const orderedColumns = getOrderedColumns(columns, columnOrder);
 
@@ -1754,13 +2119,6 @@ function showMultiInstanceWarning() {
   if (el) { showModalElement(el); }
 }
 
-// Create Select Columns
-var buttonColumn = document.getElementById('buttonColumn');
-buttonColumn.addEventListener('click', function () {
-  var table = document.getElementById('myTable');
-  addColumnToOption(objects, table);
-});
-
 function renderSumRow() {
   'use strict';
   const table = document.getElementById('myTable');
@@ -1882,51 +2240,142 @@ function addColumnToOption(data, table) {
   var selectColumns = document.getElementById('selectColumns');
   var tbl = document.getElementById('myTable');
 
-  if (!data || data.length === 0) { return; }
+  if (!selectColumns || !tbl || !data || data.length === 0) { return; }
 
   selectColumns.innerHTML = '';
 
-  // Check All / Uncheck All
+  const columns = getCanonicalBimFieldKeys();
+  const safeOrder = getSanitizedColumnOrder(columns);
+  columnOrder = safeOrder;
+  const orderedCols = getOrderedColumns(columns, safeOrder);
+
+  const managerHeader = document.createElement('div');
+  managerHeader.className = 'column-manager-header';
+  const managerTitle = document.createElement('h4');
+  managerTitle.className = 'column-manager-title';
+  managerTitle.textContent = (window.languageData && window.languageData.bimFields) || 'Campos BIM';
+  const managerMeta = document.createElement('div');
+  managerMeta.className = 'column-manager-meta';
+  managerHeader.appendChild(managerTitle);
+  managerHeader.appendChild(managerMeta);
+  selectColumns.appendChild(managerHeader);
+
+  const controlsRow = document.createElement('div');
+  controlsRow.className = 'column-manager-controls';
+  selectColumns.appendChild(controlsRow);
+
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.className = 'column-manager-search';
+  searchInput.placeholder = (window.languageData && window.languageData.searchField) || 'Pesquisar campo...';
+  controlsRow.appendChild(searchInput);
+
+  const actionRow = document.createElement('div');
+  actionRow.className = 'column-manager-actions';
+  controlsRow.appendChild(actionRow);
+
   const checkAllButton = document.createElement('button');
   checkAllButton.id = 'checkAllButton';
   checkAllButton.type = 'button';
-  checkAllButton.className = 'btn btn-sm btn-outline-primary mt-2 mb-2';
-  checkAllButton.textContent = (window.languageData && window.languageData.checkAll) || 'Check All';
-  selectColumns.appendChild(checkAllButton);
+  checkAllButton.className = 'btn btn-sm btn-outline-primary';
+  actionRow.appendChild(checkAllButton);
 
-  // Reset column order
   const resetBtn = document.createElement('button');
   resetBtn.id = 'reset-oredered-column';
-  resetBtn.className = 'btn btn-icon-only btn-text-secondary ml-2';
+  resetBtn.className = 'btn btn-icon-only btn-text-secondary';
   resetBtn.type = 'button';
+  resetBtn.title = 'Resetar ordem';
   const resetIcon = document.createElement('i');
   resetIcon.className = 'modus-icons';
   resetIcon.setAttribute('aria-hidden', 'true');
-  resetIcon.textContent = 'refresh';
+  resetIcon.textContent = '↻';
   resetBtn.appendChild(resetIcon);
-  selectColumns.appendChild(resetBtn);
+  actionRow.appendChild(resetBtn);
 
-  resetBtn.addEventListener('click', function () {
-    localStorage.setItem('columnOrder', 'none');
-    customLog('Column Order reset to: none');
+  const adjustWrap = document.createElement('div');
+  adjustWrap.className = 'column-manager-adjust';
+
+  const adjustLabel = document.createElement('label');
+  adjustLabel.className = 'column-manager-adjust-label';
+  adjustLabel.setAttribute('for', 'columnPanelSizeSelect');
+  adjustLabel.textContent = (window.languageData && window.languageData.fieldPanelAdjust) || 'Ajustar painel';
+  adjustWrap.appendChild(adjustLabel);
+
+  const adjustSelect = document.createElement('select');
+  adjustSelect.id = 'columnPanelSizeSelect';
+  adjustSelect.className = 'column-manager-adjust-select';
+
+  [
+    { value: 'compact', label: (window.languageData && window.languageData.fieldPanelCompact) || 'Compacto' },
+    { value: 'normal', label: (window.languageData && window.languageData.fieldPanelNormal) || 'Padrao' },
+    { value: 'wide', label: (window.languageData && window.languageData.fieldPanelWide) || 'Amplo' },
+    { value: 'custom', label: (window.languageData && window.languageData.fieldPanelCustom) || 'Personalizado' }
+  ].forEach(function (item) {
+    const optionEl = document.createElement('option');
+    optionEl.value = item.value;
+    optionEl.textContent = item.label;
+    adjustSelect.appendChild(optionEl);
   });
 
-  const listContainer = document.createElement('ul');
-  listContainer.id = 'sortable-list';
-  listContainer.className = 'list-group list-group-condensed';
-  selectColumns.appendChild(listContainer);
+  const currentPanelSize = getSavedColumnPanelSize();
+  adjustSelect.value = currentPanelSize;
+  applyColumnPanelSize(currentPanelSize);
 
-  const columns = Object.keys(data[0]).slice(1);
-  const orderedCols = getOrderedColumns(columns, columnOrder);
-  let isCheckedAll = false;
+  adjustSelect.addEventListener('change', function () {
+    const selected = COLUMN_PANEL_SIZE_OPTIONS.indexOf(this.value) >= 0 ? this.value : 'normal';
+    if (selected === 'custom') {
+      localStorage.setItem(COLUMN_PANEL_SIZE_KEY, 'custom');
+      localStorage.setItem(COLUMN_PANEL_WIDTH_KEY, String(getSavedColumnPanelWidth()));
+      applyColumnPanelSize('custom');
+      return;
+    }
+    localStorage.setItem(COLUMN_PANEL_SIZE_KEY, selected);
+    applyColumnPanelSize(selected);
+  });
 
-  columnOrder.forEach(function (orderKey) {
-    const key = orderedCols[columnOrder.indexOf(orderKey)];
+  initializeColumnPanelResizer(adjustSelect);
 
+  adjustWrap.appendChild(adjustSelect);
+  actionRow.appendChild(adjustWrap);
+
+  const visibleSection = document.createElement('div');
+  visibleSection.className = 'column-manager-section column-manager-section-visible';
+  const visibleTitle = document.createElement('div');
+  visibleTitle.className = 'column-manager-section-title';
+  visibleTitle.textContent = (window.languageData && window.languageData.visibleFields) || 'Visiveis';
+  const visibleList = document.createElement('ul');
+  visibleList.id = 'column-manager-visible-list';
+  visibleList.className = 'list-group list-group-condensed column-manager-list';
+  visibleSection.appendChild(visibleTitle);
+  visibleSection.appendChild(visibleList);
+  selectColumns.appendChild(visibleSection);
+
+  const availableSection = document.createElement('div');
+  availableSection.className = 'column-manager-section column-manager-section-available';
+  const availableTitle = document.createElement('div');
+  availableTitle.className = 'column-manager-section-title';
+  availableTitle.textContent = (window.languageData && window.languageData.availableFields) || 'Disponiveis';
+  const availableList = document.createElement('ul');
+  availableList.id = 'column-manager-available-list';
+  availableList.className = 'list-group list-group-condensed column-manager-list';
+  availableSection.appendChild(availableTitle);
+  availableSection.appendChild(availableList);
+  selectColumns.appendChild(availableSection);
+
+  const syncCheckAllButton = function () {
+    const allChecked = orderedCols.filter(Boolean).every(function (key) {
+      return checkboxStates[key] !== false;
+    });
+    checkAllButton.textContent = allChecked
+      ? ((window.languageData && window.languageData.uncheckAll) || 'Desmarcar Todos')
+      : ((window.languageData && window.languageData.checkAll) || 'Selecionar Todos');
+  };
+
+  const renderColumnItem = function (orderKey, key, isVisible) {
     const listItem = document.createElement('li');
-    listItem.classList.add('list-group-item', 'list-item-right-control');
+    listItem.classList.add('list-group-item', 'list-item-right-control', 'column-manager-item');
     listItem.setAttribute('data-id', orderKey);
-    listContainer.appendChild(listItem);
+    listItem.setAttribute('data-visible', isVisible ? '1' : '0');
 
     const divCheck = document.createElement('div');
     divCheck.classList.add('custom-control', 'custom-checkbox', 'checkbox-wrapper');
@@ -1938,7 +2387,7 @@ function addColumnToOption(data, table) {
 
     const inputEl = document.createElement('input');
     inputEl.type = 'checkbox';
-    inputEl.checked = checkboxStates[key] !== undefined ? checkboxStates[key] : true;
+    inputEl.checked = isVisible;
     inputEl.classList.add('custom-control-input');
     inputEl.id = key;
 
@@ -1957,55 +2406,126 @@ function addColumnToOption(data, table) {
     divCheck.appendChild(inputEl);
     divCheck.appendChild(labelEl);
 
-    // Up / Down reorder
     const spanUp = document.createElement('span');
     spanUp.classList.add('reorder-button');
-    spanUp.onclick = function () { moveItemUp(this); };
+    if (!isVisible) { spanUp.classList.add('is-disabled'); }
+    spanUp.onclick = function () {
+      if (!isVisible) { return; }
+      moveItemUp(this);
+    };
     const iUp = document.createElement('i');
     iUp.className = 'modus-icons';
     iUp.setAttribute('aria-hidden', 'true');
-    iUp.textContent = 'expand_less';
+    iUp.textContent = '▲';
     spanUp.appendChild(iUp);
     divReorder.appendChild(spanUp);
 
     const spanDown = document.createElement('span');
     spanDown.classList.add('reorder-button');
-    spanDown.onclick = function () { moveItemDown(this); };
+    if (!isVisible) { spanDown.classList.add('is-disabled'); }
+    spanDown.onclick = function () {
+      if (!isVisible) { return; }
+      moveItemDown(this);
+    };
     const iDown = document.createElement('i');
     iDown.className = 'modus-icons';
     iDown.setAttribute('aria-hidden', 'true');
-    iDown.textContent = 'expand_more';
+    iDown.textContent = '▼';
     spanDown.appendChild(iDown);
     divReorder.appendChild(spanDown);
 
-    // Check All handler — reregistrado a cada item mas age na lista completa
-    checkAllButton.addEventListener('click', function () {
-      isCheckedAll = !isCheckedAll;
-      checkAllButton.textContent = isCheckedAll
-        ? ((window.languageData && window.languageData.uncheckAll) || 'Uncheck All')
-        : ((window.languageData && window.languageData.checkAll) || 'Check All');
-      selectColumns.querySelectorAll('.custom-control-input').forEach(function (cb) {
-        cb.checked = isCheckedAll;
-        checkboxStates[cb.id] = isCheckedAll;
-      });
-      localStorage.setItem('checkboxStates', JSON.stringify(checkboxStates));
-      toggleColumnVisibility();
-    });
-
-    // Per-checkbox change
     inputEl.addEventListener('change', function () {
       checkboxStates[key] = inputEl.checked;
-      const colIdx = getColumnIndexByKey(tbl, key) + 1;
-      const cells = tbl.querySelectorAll('td:nth-child(' + colIdx + '), th:nth-child(' + colIdx + ')');
-      const filtered = Array.from(cells).filter(function (c) { return !c.id.includes('sum'); });
-      filtered.forEach(function (el) { el.style.display = inputEl.checked ? '' : 'none'; });
       localStorage.setItem('checkboxStates', JSON.stringify(checkboxStates));
+      toggleColumnVisibility();
+      sumList = Object.keys(checkboxStates).filter(function (k) { return checkboxStates[k] === true; });
+      notifyDataViewChanged();
+      renderSections(searchInput.value || '');
     });
 
-    checkboxStates[key] = inputEl.checked;
+    return listItem;
+  };
+
+  const renderSections = function (rawSearch) {
+    const search = String(rawSearch || '').trim().toLowerCase();
+    visibleList.innerHTML = '';
+    availableList.innerHTML = '';
+
+    let visibleCount = 0;
+    let availableCount = 0;
+
+    orderedCols.forEach(function (key, index) {
+      const orderKey = safeOrder[index] != null ? safeOrder[index] : index;
+      if (!key) { return; }
+
+      const displayLabel = String(getColumnDisplayLabel(key) || key).toLowerCase();
+      const keyLabel = String(key).toLowerCase();
+      if (search && displayLabel.indexOf(search) === -1 && keyLabel.indexOf(search) === -1) {
+        return;
+      }
+
+      const isVisible = checkboxStates[key] !== undefined ? checkboxStates[key] : true;
+      checkboxStates[key] = isVisible;
+
+      const item = renderColumnItem(orderKey, key, isVisible);
+      if (isVisible) {
+        visibleList.appendChild(item);
+        visibleCount += 1;
+      } else {
+        availableList.appendChild(item);
+        availableCount += 1;
+      }
+    });
+
+    if (visibleCount === 0) {
+      const emptyVisible = document.createElement('li');
+      emptyVisible.className = 'list-group-item column-manager-empty';
+      emptyVisible.textContent = 'Nenhum campo visivel';
+      visibleList.appendChild(emptyVisible);
+    }
+
+    if (availableCount === 0) {
+      const emptyAvailable = document.createElement('li');
+      emptyAvailable.className = 'list-group-item column-manager-empty';
+      emptyAvailable.textContent = 'Nenhum campo disponivel';
+      availableList.appendChild(emptyAvailable);
+    }
+
+    managerMeta.textContent = visibleCount + ' visiveis / ' + availableCount + ' disponiveis';
+    syncCheckAllButton();
+  };
+
+  checkAllButton.addEventListener('click', function () {
+    const allChecked = orderedCols.filter(Boolean).every(function (key) {
+      return checkboxStates[key] !== false;
+    });
+    const nextChecked = !allChecked;
+
+    orderedCols.forEach(function (key) {
+      if (!key) { return; }
+      checkboxStates[key] = nextChecked;
+    });
+
+    localStorage.setItem('checkboxStates', JSON.stringify(checkboxStates));
+    toggleColumnVisibility();
+    sumList = Object.keys(checkboxStates).filter(function (k) { return checkboxStates[k] === true; });
+    notifyDataViewChanged();
+    renderSections(searchInput.value || '');
   });
 
+  resetBtn.addEventListener('click', function () {
+    localStorage.setItem('columnOrder', 'none');
+    customLog('Column Order reset to: none');
+    updateData(objects, savedSettings, layerList, dynamicList, customKeys, ifcSummary);
+  });
+
+  searchInput.addEventListener('input', function () {
+    renderSections(searchInput.value || '');
+  });
+
+  renderSections('');
   sumList = Object.keys(checkboxStates).filter(function (k) { return checkboxStates[k] === true; });
+  notifyDataViewChanged();
 
   currentLanguage = localStorage.getItem('language') || 'pt';
   loadLanguage(currentLanguage);
@@ -2030,7 +2550,11 @@ function toggleColumnVisibility() {
 function moveItemUp(button) {
   'use strict';
   const item = button.parentElement.parentElement;
-  const prev = item.previousElementSibling;
+  if (!item || !item.getAttribute('data-id')) { return; }
+  let prev = item.previousElementSibling;
+  while (prev && (!prev.getAttribute('data-id') || prev.getAttribute('data-visible') !== item.getAttribute('data-visible'))) {
+    prev = prev.previousElementSibling;
+  }
   if (prev) { item.parentElement.insertBefore(item, prev); }
   getUpdatedOrder();
 }
@@ -2038,14 +2562,18 @@ function moveItemUp(button) {
 function moveItemDown(button) {
   'use strict';
   const item = button.parentElement.parentElement;
-  const next = item.nextElementSibling;
+  if (!item || !item.getAttribute('data-id')) { return; }
+  let next = item.nextElementSibling;
+  while (next && (!next.getAttribute('data-id') || next.getAttribute('data-visible') !== item.getAttribute('data-visible'))) {
+    next = next.nextElementSibling;
+  }
   if (next) { item.parentElement.insertBefore(next, item); }
   getUpdatedOrder();
 }
 
 function getUpdatedOrder() {
   'use strict';
-  const items = document.querySelectorAll('#sortable-list li');
+  const items = document.querySelectorAll('#column-manager-visible-list li[data-id], #column-manager-available-list li[data-id]');
   const newOrder = [];
   items.forEach(function (item, i) { newOrder[i] = item.getAttribute('data-id'); });
   localStorage.setItem('columnOrder', newOrder);
@@ -2848,6 +3376,11 @@ function resolveQueryFieldKey(rawField) {
   const token = normalizeQueryToken(rawField);
   if (!token) { return ''; }
 
+  if (typeof BIMSchemaRegistry !== 'undefined' && BIMSchemaRegistry.resolveFieldKey) {
+    const resolved = BIMSchemaRegistry.resolveFieldKey(rawField);
+    if (resolved) { return resolved; }
+  }
+
   const aliases = {
     classe_ifc: 'ifc',
     ifc_class: 'ifc',
@@ -3469,17 +4002,35 @@ function renderTabela(elements) {
     filteredElements = list;
   }
 
+  const visibleCheck = (keys) => {
+    if (!window.BIMDataView || typeof window.BIMDataView.isFieldVisible !== 'function') { return true; }
+    return window.BIMDataView.isFieldVisible(keys);
+  };
+
   let metricKey = 'volume';
   let metricLabel = 'Volume (m³)';
-  if (activeTag && window.tagModel && window.tagModel[activeTag]) {
-    const g = window.tagModel[activeTag] || {};
-    if (Number(g.volume || 0) <= 0 && Number(g.area || 0) > 0) {
-      metricKey = 'area';
-      metricLabel = 'Area (m²)';
-    } else if (Number(g.volume || 0) <= 0 && Number(g.area || 0) <= 0) {
-      metricKey = 'comprimento';
-      metricLabel = 'Metro Linear (m)';
+  const metricCandidates = [
+    {
+      key: 'volume',
+      label: 'Volume (m³)',
+      visible: visibleCheck(['volume', 'volume_total'])
+    },
+    {
+      key: 'area',
+      label: 'Area (m²)',
+      visible: visibleCheck(['area', 'area_total', 'area_xy', 'area_xz'])
+    },
+    {
+      key: 'comprimento',
+      label: 'Metro Linear (m)',
+      visible: visibleCheck(['comprimento', 'metro_linear_total', 'metro_linear', 'len_x', 'len_y', 'len_z', 'len_xy', 'len_xz', 'len_xyz'])
     }
+  ];
+
+  const firstVisibleMetric = metricCandidates.find(function (candidate) { return candidate.visible; });
+  if (firstVisibleMetric) {
+    metricKey = firstVisibleMetric.key;
+    metricLabel = firstVisibleMetric.label;
   }
 
   const sectionTitle = activeTag ? activeTag : 'GLOBAL';

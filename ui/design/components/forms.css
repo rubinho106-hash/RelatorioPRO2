@@ -1,0 +1,33 @@
+#dashboardSearchInput,
+#findInput,
+#replaceInput,
+#filtroPavimento,
+.filter-select,
+#buttonColumn,
+.field input,
+.field select,
+.modal input,
+.modal select,
+.modal textarea {
+    border-radius: var(--rp-radius-sm);
+}
+
+#dashboardSearchInput:focus,
+#findInput:focus,
+#replaceInput:focus,
+#filtroPavimento:focus,
+.filter-select:focus,
+.field input:focus,
+.field select:focus,
+.modal input:focus,
+.modal select:focus,
+.modal textarea:focus,
+button:focus-visible {
+    outline: none;
+    box-shadow: var(--rp-focus-ring);
+}
+
+.zoom-track,
+.zoom-track::after {
+    transition: all var(--rp-transition-fast) var(--rp-motion-ease);
+}

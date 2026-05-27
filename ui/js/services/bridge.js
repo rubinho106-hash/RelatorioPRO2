@@ -137,14 +137,22 @@ const Bridge = (() => {
     /**
      * Select all model entities that belong to a TAG/LAYER
      * @param {string} tagName - TAG name
-     * @param {object} options - { focus: boolean }
+     * @param {object} options - { focus: boolean, isolate: boolean }
      */
     selectTagEntities(tagName, options = {}) {
       const name = String(tagName || '').trim();
       if (!name) return;
 
       const focus = !!(options && options.focus);
-      _safeCall('select_tag_entities', [name, focus]);
+      const isolate = !!(options && options.isolate);
+      _safeCall('select_tag_entities', [name, focus, isolate]);
+    },
+
+    /**
+     * Clear temporary TAG isolation and restore original visibility
+     */
+    clearTagIsolation() {
+      _safeCall('clear_tag_isolation', []);
     },
 
     /**

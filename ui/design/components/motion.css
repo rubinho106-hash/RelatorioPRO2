@@ -1,0 +1,58 @@
+.rp-hover-lift {
+    transition:
+        transform var(--rp-transition-fast) var(--rp-motion-ease),
+        box-shadow var(--rp-transition-normal) var(--rp-motion-ease);
+}
+
+.rp-hover-lift:hover {
+    transform: translateY(-1px);
+}
+
+.rp-fade {
+    animation: rp-fade-up var(--rp-motion-base) var(--rp-motion-ease) both;
+}
+
+.rp-pulse {
+    animation: rp-pulse 1.2s var(--rp-motion-ease) infinite;
+}
+
+@keyframes rp-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(21, 148, 216, 0.34);
+    }
+
+    100% {
+        box-shadow: 0 0 0 8px rgba(21, 148, 216, 0);
+    }
+}
+
+/* Mapping utilities to existing runtime selectors */
+.summary-card,
+.card,
+.tag-kpi-card,
+.ifc-summary-card,
+.ifc-exec-card,
+.menu-item,
+.details-action-btn,
+.dashboard-nav-btn,
+.ifc-summary-btn,
+.tag-dashboard-btn {
+    transition:
+        transform var(--rp-transition-fast) var(--rp-motion-ease),
+        box-shadow var(--rp-transition-normal) var(--rp-motion-ease),
+        border-color var(--rp-transition-normal) var(--rp-motion-ease),
+        background var(--rp-transition-normal) var(--rp-motion-ease);
+}
+
+.summary-card:hover,
+.card:hover,
+.tag-kpi-card:hover,
+.ifc-summary-card:hover,
+.ifc-exec-card:hover,
+.menu-item:hover,
+.details-action-btn:hover,
+.dashboard-nav-btn:hover,
+.ifc-summary-btn:hover,
+.tag-dashboard-btn:hover {
+    transform: translateY(-1px);
+}

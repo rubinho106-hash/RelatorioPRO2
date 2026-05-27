@@ -1,0 +1,85 @@
+/* Application shell layout */
+
+#dashboardContainer {
+    display: grid;
+    grid-template-columns: var(--rp-sidebar-width) minmax(0, 1fr);
+    grid-template-rows: 1fr;
+    grid-template-areas: "sidebar content";
+    height: 100%;
+}
+
+#menu {
+    grid-area: sidebar;
+    overflow-y: auto;
+}
+
+.content {
+    grid-area: content;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.content.has-fixed-bim-panel {
+    --rp-bim-panel-space: 440px;
+    padding-right: var(--rp-bim-panel-space);
+}
+
+.content.has-fixed-bim-panel.bim-panel-collapsed {
+    padding-right: 0;
+}
+
+/* Legacy column toolbar now belongs to content area */
+.content #toolbar-row {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    width: 100%;
+    margin: 0;
+    border-left: none;
+    flex-shrink: 0;
+}
+
+/* Keep legacy column toolbar visible across current layouts. */
+.layout-dashboard #toolbar-row,
+.layout-tag #toolbar-row,
+.layout-element #toolbar-row,
+.layout-table #toolbar-row {
+    display: flex !important;
+}
+
+/* View hooks (multi-view architecture) */
+.view-dashboard #dashboardContainer,
+.view-table #dashboardContainer {
+    display: grid;
+}
+
+@media (max-width: 1020px) {
+    #dashboardContainer {
+        grid-template-columns: 220px minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 1240px) {
+    .content.has-fixed-bim-panel {
+        --rp-bim-panel-space: 380px;
+    }
+}
+
+@media (max-width: 720px) {
+    #dashboardContainer {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        grid-template-areas:
+            "sidebar"
+            "content";
+    }
+
+    .content.has-fixed-bim-panel {
+        --rp-bim-panel-space: 0px;
+        padding-right: 0;
+    }
+}
