@@ -421,11 +421,17 @@ function notifyDataViewChanged() {
   }
 }
 
-window.BIMDataView = {
-  getVisibleColumns: getVisibleColumnKeys,
-  isFieldVisible: isFieldVisible,
-  notifyChanged: notifyDataViewChanged
-};
+// Se KPIConfig (novo painel) está disponível, ele controla BIMDataView.
+// Caso contrário, usa o sistema legado de checkboxStates.
+if (typeof window.KPIConfig !== 'undefined' && typeof window.KPIConfig.installBIMDataView === 'function') {
+  window.KPIConfig.installBIMDataView();
+} else {
+  window.BIMDataView = {
+    getVisibleColumns: getVisibleColumnKeys,
+    isFieldVisible: isFieldVisible,
+    notifyChanged: notifyDataViewChanged
+  };
+}
 
 document.addEventListener('DOMContentLoaded', function () {
   if (typeof ViewRegistry !== 'undefined' && typeof ViewRegistry.register === 'function') {

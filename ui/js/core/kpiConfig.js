@@ -201,7 +201,12 @@ const KPIConfig = (() => {
   const installBIMDataView = () => {
     window.BIMDataView = {
       getVisibleColumns: () => getVisibleKeys(),
-      isFieldVisible: (keys) => isAnyVisible(Array.isArray(keys) ? keys : [keys])
+      isFieldVisible: (keys) => isAnyVisible(Array.isArray(keys) ? keys : [keys]),
+      notifyChanged: () => {
+        if (typeof RenderManager !== 'undefined' && RenderManager.renderAll) {
+          RenderManager.renderAll();
+        }
+      }
     };
   };
 
@@ -210,6 +215,18 @@ const KPIConfig = (() => {
 
 window.KPIConfig = KPIConfig;
 
-// Instala BIMDataView imediatamente para que KPICardsModule e DetailsModule
-// o encontrem quando forem chamados
+// Instala imediatamente
 KPIConfig.installBIMDataView();
+
+// info.js sobrescreve BIMDataView no script load (linha 424). Reinstala depois
+// do DOMContentLoaded para garantir que KPIConfig vence a corrida.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    KPIConfig.installBIMDataView();
+    if (typeof RenderManager !== 'undefined' && RenderManager.renderAll) {
+      RenderManager.renderAll();
+    }
+  });
+} else {
+  KPIConfig.installBIMDataView();
+}
