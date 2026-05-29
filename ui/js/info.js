@@ -3689,16 +3689,20 @@ function renderGlobalSummary() {
       const totalCost = concCost + epsCost;
       const slabWeight = Number(parseLocalizedNumberDisplay(e.slab_weight_kg || e.slab_weight_total_kg || 0));
 
+      const _kpi = (typeof KPIConfig !== 'undefined') ? KPIConfig : null;
+      const _kv = (key) => !_kpi || _kpi.isVisible(key);
+      const _c = (key, html) => _kv(key) ? html : '';
+      const absVol = Math.abs(vol);
       globalSummary.innerHTML =
-        '<div class="summary-card"><h4>Elemento Selecionado</h4><p>' + getElementLabel(e) + '</p><span class="meta">Modo: ELEMENTO</span></div>' +
-        '<div class="summary-card"><h4>TAG</h4><p>' + tag + '</p></div>' +
-        '<div class="summary-card"><h4>IFC</h4><p>' + ifc + '</p></div>' +
-        '<div class="summary-card"><h4>Pavimento</h4><p>' + pav + '</p></div>' +
-        '<div class="summary-card"><h4>Comprimento</h4><p>' + len.toFixed(2) + ' m</p></div>' +
-        '<div class="summary-card"><h4>Área</h4><p>' + area.toFixed(2) + ' m²</p></div>' +
-        '<div class="summary-card"><h4>Volume</h4><p>' + vol.toFixed(2) + ' m³</p></div>' +
-        '<div class="summary-card"><h4>Custo</h4><p>R$ ' + totalCost.toFixed(2) + '</p></div>' +
-        '<div class="summary-card"><h4>Peso</h4><p>' + slabWeight.toFixed(0) + ' kg</p></div>';
+        _c('elemento', '<div class="summary-card"><h4>Elemento Selecionado</h4><p>' + getElementLabel(e) + '</p><span class="meta">Modo: ELEMENTO</span></div>') +
+        _c('tag',      '<div class="summary-card"><h4>TAG</h4><p>' + tag + '</p></div>') +
+        _c('ifc',      '<div class="summary-card"><h4>IFC</h4><p>' + ifc + '</p></div>') +
+        _c('pavimento','<div class="summary-card"><h4>Pavimento</h4><p>' + pav + '</p></div>') +
+        _c('comprimento','<div class="summary-card"><h4>Comprimento</h4><p>' + len.toFixed(2) + ' m</p></div>') +
+        _c('area',     '<div class="summary-card"><h4>Área</h4><p>' + area.toFixed(2) + ' m²</p></div>') +
+        _c('volume',   '<div class="summary-card"><h4>Volume</h4><p>' + absVol.toFixed(2) + ' m³</p></div>') +
+        _c('custo',    '<div class="summary-card"><h4>Custo</h4><p>R$ ' + totalCost.toFixed(2) + '</p></div>') +
+        _c('peso',     '<div class="summary-card"><h4>Peso</h4><p>' + slabWeight.toFixed(0) + ' kg</p></div>');
       return;
     }
   }
