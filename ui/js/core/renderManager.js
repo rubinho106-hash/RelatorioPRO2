@@ -156,9 +156,14 @@ const RenderManager = (() => {
     }
 
     // 6. Renderizar conteúdo principal baseado no modo (TAG é contexto principal).
-    if (renderContext?.workspace?.mode === 'element' && renderContext?.workspace?.activeElement) {
+    // Fallback para AppState quando buildRenderContext não está disponível.
+    const wsMode = (renderContext?.workspace?.mode || state.mode || '').toLowerCase();
+    const activeTag = renderContext?.workspace?.activeTag || state.currentTag;
+    const activeElement = renderContext?.workspace?.activeElement || state.currentElement;
+
+    if (wsMode === 'element' && activeElement && !activeTag) {
       _renderElementMode(state);
-    } else if (renderContext?.workspace?.mode === 'tag' || renderContext?.workspace?.activeTag) {
+    } else if (wsMode === 'tag' || activeTag) {
       _renderTagMode(state);
     } else {
       _renderGlobalMode(state);
