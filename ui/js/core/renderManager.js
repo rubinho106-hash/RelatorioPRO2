@@ -210,25 +210,18 @@ const RenderManager = (() => {
     const alerta = document.getElementById('alerta');
     const resumo = document.getElementById('resumo');
     if (alerta) alerta.innerHTML = '';
-    if (resumo) resumo.innerHTML = '';
+    if (resumo) {
+      resumo.innerHTML = '';
+      _setDashboardPanelVisible(resumo, false);
+    }
 
-    // Renderizar resumo de etiquetas
-    _renderResumoEtiquetas();
+    // Resumo de etiquetas removido — informação ja disponivel na sidebar esquerda
+    // Tabela de tags duplicada removida — selecione uma TAG na sidebar para
+    // ver os elementos individuais
 
-    // Tabela de tags
-    const rows = Object.keys(window.tagModel || {}).map((tagName) => {
-      const g = window.tagModel[tagName] || {};
-      return {
-        instance: tagName,
-        ifc: 'TAG',
-        storey: Number(g.total_elementos || (g.elementos || []).length || 0) + ' elementos',
-        comprimento: Number(g.metro_linear || 0).toFixed(2) + ' m',
-        area: Number(g.area || 0).toFixed(2)
-      };
-    });
-
-    if (typeof renderTabela === 'function') {
-      renderTabela(rows);
+    const tabelaWrapper = document.getElementById('tabelaWrapper');
+    if (tabelaWrapper) {
+      _setDashboardPanelVisible(tabelaWrapper, false);
     }
 
     EventBus.emit('render:completed', { mode: 'global' });
