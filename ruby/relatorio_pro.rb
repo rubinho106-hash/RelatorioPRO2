@@ -750,6 +750,15 @@ module RelatorioPRO
 			volume: metrics[:volume_m3],
 			area_total: metrics[:area_m2],
 			volume_total: metrics[:volume_m3],
+			# Dimensoes individuais do bounding box (m)
+			len_x: metrics[:len_x],
+			len_y: metrics[:len_y],
+			len_z: metrics[:len_z],
+			len_xy: metrics[:len_xy],
+			len_xz: metrics[:len_xz],
+			len_xyz: metrics[:len_xyz],
+			area_xy: metrics[:area_xy],
+			area_xz: metrics[:area_xz],
 			custom: "",
 			total: 0,
 			is_group: false,
@@ -934,11 +943,49 @@ module RelatorioPRO
 	end
 
 	def entity_metrics(entity)
+		dims = bounding_box_dims_m(entity)
 		{
-			length_m: safe_entity_length_m(entity),
+			length_m: dims[:max_m],
 			area_m2: safe_entity_area_m2(entity),
-			volume_m3: safe_entity_volume_m3(entity)
+			volume_m3: safe_entity_volume_m3(entity),
+			len_x: dims[:x],
+			len_y: dims[:y],
+			len_z: dims[:z],
+			len_xy: dims[:xy_text],
+			len_xz: dims[:xz_text],
+			len_xyz: dims[:xyz_text],
+			area_xy: dims[:area_xy],
+			area_xz: dims[:area_xz]
 		}
+	end
+
+	# Extrai dimensoes do bounding box do entity em metros.
+	# Retorna hash com x, y, z lineares + areas calculadas + textos concatenados.
+	def bounding_box_dims_m(entity)
+		empty = { x: 0, y: 0, z: 0, max_m: 0,
+				  xy_text: "", xz_text: "", xyz_text: "",
+				  area_xy: 0, area_xz: 0 }
+		return empty unless entity.respond_to?(:bounds) && entity.bounds
+
+		bb = entity.bounds
+		# SketchUp bounds: width = eixo X, depth = eixo Y, height = eixo Z
+		x = (bb.width.to_f  * INCH_TO_M).round(4)
+		y = (bb.depth.to_f  * INCH_TO_M).round(4)
+		z = (bb.height.to_f * INCH_TO_M).round(4)
+
+		{
+			x: x,
+			y: y,
+			z: z,
+			max_m: [x, y, z].max,
+			xy_text:  format("%.2f x %.2f",        x, y),
+			xz_text:  format("%.2f x %.2f",        x, z),
+			xyz_text: format("%.2f x %.2f x %.2f", x, y, z),
+			area_xy: (x * y).round(4),
+			area_xz: (x * z).round(4)
+		}
+	rescue StandardError
+		empty
 	end
 
 	def safe_entity_length_m(entity)

@@ -90,6 +90,10 @@ const RelatorioDataLoader = (() => {
             const quantity = 1;
             const area = toSafeNumber(element.area);
             const volume = toSafeNumber(element.volume);
+            const lenX = toSafeNumber(element.len_x || element.length_x);
+            const lenY = toSafeNumber(element.len_y || element.length_y);
+            const lenZ = toSafeNumber(element.len_z || element.length_z);
+            const fmt2 = (n) => (Math.round(Number(n) * 100) / 100).toFixed(2);
 
             return {
                 ordinal: index + 1,
@@ -110,6 +114,15 @@ const RelatorioDataLoader = (() => {
                 area_total: area,
                 volume_total: volume,
                 metro_linear_total: 0,
+                // Dimensoes individuais do bounding box (m)
+                len_x: lenX,
+                len_y: lenY,
+                len_z: lenZ,
+                len_xy: lenX && lenY ? (fmt2(lenX) + ' x ' + fmt2(lenY)) : '',
+                len_xz: lenX && lenZ ? (fmt2(lenX) + ' x ' + fmt2(lenZ)) : '',
+                len_xyz: lenX && lenY && lenZ ? (fmt2(lenX) + ' x ' + fmt2(lenY) + ' x ' + fmt2(lenZ)) : '',
+                area_xy: Math.round(lenX * lenY * 10000) / 10000,
+                area_xz: Math.round(lenX * lenZ * 10000) / 10000,
                 total: 0,
                 is_group: false
             };
