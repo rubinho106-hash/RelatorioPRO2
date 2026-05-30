@@ -599,7 +599,9 @@ module RelatorioPRO
 		frame = 0
 		timer_id = nil
 
-		timer_id = UI.start_timer(interval, true) do
+		# IMPORTANTE: ::UI (global) — sem prefixo o Ruby resolve para
+		# RelatorioPRO::UI (modulo interno do plugin) que nao tem start_timer
+		timer_id = ::UI.start_timer(interval, true) do
 			frame += 1
 			t = [frame.to_f / frame_count, 1.0].min
 
@@ -612,7 +614,7 @@ module RelatorioPRO
 			view.invalidate
 
 			if frame >= frame_count
-				UI.stop_timer(timer_id) if timer_id
+				::UI.stop_timer(timer_id) if timer_id
 			end
 		end
 	rescue StandardError => e
@@ -746,7 +748,7 @@ module RelatorioPRO
 		mark_live_dirty(source, origin)
 
 		cancel_live_refresh_timer
-		@live_refresh_timer = UI.start_timer(LIVE_REFRESH_DEBOUNCE_SECONDS, false) do
+		@live_refresh_timer = ::UI.start_timer(LIVE_REFRESH_DEBOUNCE_SECONDS, false) do
 			@live_refresh_timer = nil
 			perform_live_refresh
 		end
@@ -771,7 +773,7 @@ module RelatorioPRO
 	def cancel_live_refresh_timer
 		return unless defined?(@live_refresh_timer) && @live_refresh_timer
 
-		UI.stop_timer(@live_refresh_timer)
+		::UI.stop_timer(@live_refresh_timer)
 		@live_refresh_timer = nil
 	rescue StandardError => e
 		puts("[RelatorioPRO] cancel_live_refresh_timer error: #{e.class}: #{e.message}")
