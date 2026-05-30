@@ -27,12 +27,12 @@
 }
 
 /* Mapping utilities to existing runtime selectors */
+/* .menu-item excluido — usa visual flat unificado com painel CAMPOS */
 .summary-card,
 .card,
 .tag-kpi-card,
 .ifc-summary-card,
 .ifc-exec-card,
-.menu-item,
 .details-action-btn,
 .dashboard-nav-btn,
 .ifc-summary-btn,
@@ -49,7 +49,6 @@
 .tag-kpi-card:hover,
 .ifc-summary-card:hover,
 .ifc-exec-card:hover,
-.menu-item:hover,
 .details-action-btn:hover,
 .dashboard-nav-btn:hover,
 .ifc-summary-btn:hover,
