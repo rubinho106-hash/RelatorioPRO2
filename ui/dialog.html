@@ -209,74 +209,82 @@
     }
 
     /* ✅ Dashboard-first: Menu visualmente prioritário */
+    /* Sidebar com mesma identidade visual do painel CAMPOS */
     #menu {
       width: 220px;
       min-width: 220px;
       overflow-y: auto;
-      border-right: 1px solid #0f172a;
-      background: #1e293b;
-      color: #ffffff;
-      padding: 10px;
+      border-right: 1px solid #2d3540;
+      background: #1a1f26;
+      color: #c5d0dc;
+      padding: 0;
+      font-family: "Inter", "Segoe UI", Arial, sans-serif;
     }
 
     .menu-section-title {
-      font-size: 11px;
+      font-size: 10px;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #8fa2bf;
+      letter-spacing: 0.07em;
+      color: #4a5568;
       font-weight: 700;
-      padding: 8px 2px 6px;
-      margin-top: 6px;
+      padding: 12px 14px 6px;
+      border-top: 1px solid #1e2530;
     }
 
     .menu-section-title:first-child {
-      margin-top: 0;
+      border-top: none;
+      padding-top: 14px;
     }
 
     .menu-item {
-      padding: 10px 11px;
-      border-radius: 10px;
-      margin-bottom: 4px;
+      padding: 8px 14px;
+      border-radius: 0;
+      margin: 0;
       cursor: pointer;
       background: transparent;
-      transition: background var(--rp-motion-base) var(--rp-motion-ease), border-color var(--rp-motion-base) var(--rp-motion-ease), transform var(--rp-motion-base) var(--rp-motion-ease);
-      font-weight: 600;
-      color: #e2e8f0;
-      border: 1px solid transparent;
+      transition: background .12s;
+      font-weight: 500;
+      color: #c5d0dc;
+      border: none;
+      border-left: 2px solid transparent;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 10px;
+      user-select: none;
     }
 
     .menu-item:hover {
-      background: #334155;
-      border-color: #475569;
+      background: rgba(255, 255, 255, 0.04);
     }
 
     .menu-item.active {
-      background: #3b82f6;
+      background: rgba(14, 165, 233, 0.10);
+      border-left-color: #0ea5e9;
       color: #fff;
-      font-weight: 700;
     }
 
     .menu-item-main {
       min-width: 0;
       display: inline-flex;
       align-items: center;
-      gap: 9px;
+      gap: 10px;
     }
 
     .menu-item-icon {
-      width: 26px;
-      height: 26px;
-      border-radius: 7px;
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: 13px;
-      background: rgba(15, 23, 42, 0.45);
-      flex: 0 0 26px;
+      font-size: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      flex: 0 0 22px;
+    }
+
+    .menu-item.active .menu-item-icon {
+      background: rgba(14, 165, 233, 0.20);
     }
 
     .menu-item-text {
@@ -288,6 +296,7 @@
 
     .menu-item-text strong {
       font-size: 12px;
+      font-weight: 600;
       letter-spacing: 0.02em;
       white-space: nowrap;
       overflow: hidden;
@@ -295,19 +304,32 @@
     }
 
     .menu-item-text small {
-      font-size: 11px;
-      color: rgba(226, 232, 240, 0.8);
+      font-size: 10px;
+      color: #6b7785;
+      font-weight: 400;
+    }
+
+    .menu-item.active .menu-item-text small {
+      color: #8fa3b8;
     }
 
     .menu-item-badge {
-      border-radius: 999px;
-      padding: 3px 8px;
-      font-size: 10px;
+      border-radius: 3px;
+      padding: 2px 6px;
+      font-size: 9px;
       font-weight: 700;
-      background: rgba(15, 23, 42, 0.68);
-      color: #dbeafe;
+      letter-spacing: 0.04em;
+      background: rgba(255, 255, 255, 0.06);
+      color: #8fa3b8;
       line-height: 1;
       flex-shrink: 0;
+      border: 1px solid #2d3540;
+    }
+
+    .menu-item.active .menu-item-badge {
+      background: rgba(14, 165, 233, 0.15);
+      color: #0ea5e9;
+      border-color: rgba(14, 165, 233, 0.3);
     }
 
     /* ✅ Content principal: resumo + tabela */
@@ -1908,21 +1930,23 @@
       border-top-color: var(--rp-border);
     }
 
+    /* Overrides do tema antigo neutralizados — estilo unificado vem do
+       bloco principal #menu / .menu-item (~linha 212) */
     #menu {
-      background: var(--rp-bg-dark);
-      border-right-color: var(--rp-border);
+      background: #1a1f26;
+      border-right-color: #2d3540;
     }
 
     .menu-item {
-      color: var(--rp-text-primary);
+      color: #c5d0dc;
     }
 
     .menu-item:hover {
-      background: var(--rp-bg-hover);
+      background: rgba(255, 255, 255, 0.04);
     }
 
     .menu-item.active {
-      background: linear-gradient(135deg, var(--rp-primary-dark), var(--rp-primary));
+      background: rgba(14, 165, 233, 0.10);
     }
 
     .content {
@@ -1998,13 +2022,15 @@
       color: #9fb4d4;
     }
 
+    /* Sobrescritos no bloco principal — overrides legados desativados */
     .menu-item.active .menu-item-icon {
-      background: rgba(15, 23, 42, 0.42);
+      background: rgba(14, 165, 233, 0.20);
     }
 
     .menu-item.active .menu-item-badge {
-      background: rgba(15, 23, 42, 0.42);
-      color: #ffffff;
+      background: rgba(14, 165, 233, 0.15);
+      color: #0ea5e9;
+      border-color: rgba(14, 165, 233, 0.3);
     }
 
     .card p,
