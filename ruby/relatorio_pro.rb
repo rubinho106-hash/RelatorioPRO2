@@ -446,13 +446,18 @@ module RelatorioPRO
 				:isometric
 			end
 
+		# IMPORTANTE: dir e a direcao que a CAMERA OLHA (eye -> target).
+		# new_eye = target - dir * distance, portanto:
+		#   - dir.z NEGATIVO  -> eye fica ACIMA do target (olhar de cima)
+		#   - dir.y POSITIVO  -> eye fica ao SUL do target (olhar do sul p/ norte)
+		#   - dir.x NEGATIVO  -> eye fica a ESQUERDA do target
 		dir =
 			case shape
-			when :vertical   then Geom::Vector3d.new( 1.0, -1.5,  0.4)
-			when :horizontal then Geom::Vector3d.new( 0.8, -0.8,  1.4)
-			when :linear_x   then Geom::Vector3d.new( 0.2, -1.5,  0.6)
-			when :linear_y   then Geom::Vector3d.new(-1.5, -0.2,  0.6)
-			else                  Geom::Vector3d.new( 1.0, -1.0,  0.8)
+			when :vertical   then Geom::Vector3d.new(-1.0,  1.0, -0.3)  # pilar: vista NE-frontal
+			when :horizontal then Geom::Vector3d.new(-0.5,  0.5, -1.2)  # laje: quase de cima
+			when :linear_x   then Geom::Vector3d.new(-0.2,  1.2, -0.5)  # viga em X: vista lateral
+			when :linear_y   then Geom::Vector3d.new( 1.2, -0.2, -0.5)  # viga em Y: vista frontal
+			else                  Geom::Vector3d.new(-1.0,  1.0, -0.7)  # iso 3/4 classica
 			end
 		dir.normalize!
 
@@ -468,13 +473,14 @@ module RelatorioPRO
 		new_eye = target.offset(dir.reverse, distance)
 		new_up  = Geom::Vector3d.new(0, 0, 1)
 
+		# Animacao mais lenta e mais frames que o focus simples (suavidade visual)
 		animate_camera_transition(
 			view,
 			camera.eye, new_eye,
 			camera.target, target,
 			new_up,
-			CAMERA_FOCUS_DURATION_SECONDS,
-			CAMERA_FOCUS_STEPS
+			0.5,   # duracao em segundos
+			30     # frames (60 fps equivalente)
 		)
 
 		bim_trace("smart_focus", shape: shape, w_m: (w * INCH_TO_M).round(2),
