@@ -47,10 +47,8 @@ const KPICardsModule = (() => {
       return [];
     }
 
-    const blocked = new Set([
-      'id', 'ordinal', 'image', 'definition', 'entity', 'description',
-      'url', 'status', 'owner', 'selection', 'in_model'
-    ]);
+    // Apenas campos sem qualquer valor visual (id interno) sao ocultos
+    const blocked = new Set(['id', 'selection', 'in_model']);
 
     return window.BIMDataView.getVisibleColumns()
       .map((key) => String(key || '').trim())
@@ -61,11 +59,7 @@ const KPICardsModule = (() => {
         }
         return key;
       })
-      .filter((key, index, arr) => arr.indexOf(key) === index)
-      .filter((key) => {
-        const meta = _fieldMeta(key);
-        return !meta || meta.chartable !== false;
-      });
+      .filter((key, index, arr) => arr.indexOf(key) === index);
   };
 
   const _fieldAliases = {
@@ -213,14 +207,22 @@ const KPICardsModule = (() => {
     };
   };
 
+  const _buildEmptyCard = (title) => {
+    return {
+      title: title,
+      value: '—',
+      meta: 'sem dados disponiveis'
+    };
+  };
+
   const _buildFieldCard = (fieldKey, rows) => {
     const values = (rows || [])
       .map((row) => _getFieldValue(row, fieldKey))
       .filter((v) => v !== null && v !== undefined && String(v).trim() !== '');
 
-    if (values.length === 0) { return null; }
-
     const title = _schemaLabel(fieldKey);
+    if (values.length === 0) { return _buildEmptyCard(title); }
+
     if (_isMostlyNumeric(values)) {
       return _buildNumericCard(title, fieldKey, values);
     }
