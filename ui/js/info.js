@@ -3551,6 +3551,55 @@ function findElementByKey(key) {
   return null;
 }
 
+// Monta o texto do label flutuante baseado nos campos KPI ativos no painel.
+// Cada linha = "Label: valor unidade". Limita a 6 linhas para nao poluir a tela.
+function buildElementInfoLabel(element) {
+  'use strict';
+  if (!element || typeof element !== 'object') { return ''; }
+
+  // Mapa: chave do KPIConfig -> { keys no row, formatter }
+  const fmt2 = (n) => (Math.round(Number(n || 0) * 100) / 100).toFixed(2).replace('.', ',');
+  const fmt3 = (n) => (Math.round(Number(n || 0) * 1000) / 1000).toFixed(3).replace('.', ',');
+  const txt = (v) => String(v == null ? '' : v).trim();
+  const FIELDS = [
+    { key: 'instance',    label: 'Nome',       get: (e) => txt(e.instance || e.nome || e.entity) },
+    { key: 'ifc',         label: 'IFC',        get: (e) => txt(e.ifc) },
+    { key: 'tag',         label: 'TAG',        get: (e) => txt(e.tag) },
+    { key: 'storey',      label: 'Pavimento',  get: (e) => txt(e.storey || e.pavimento) },
+    { key: 'pavimento',   label: 'Pavimento',  get: (e) => txt(e.storey || e.pavimento) },
+    { key: 'material',    label: 'Material',   get: (e) => txt(e.material) },
+    { key: 'len_x',       label: 'X',          get: (e) => Number(e.len_x || 0) > 0 ? fmt2(e.len_x) + ' m' : null },
+    { key: 'len_y',       label: 'Y',          get: (e) => Number(e.len_y || 0) > 0 ? fmt2(e.len_y) + ' m' : null },
+    { key: 'len_z',       label: 'Z',          get: (e) => Number(e.len_z || 0) > 0 ? fmt2(e.len_z) + ' m' : null },
+    { key: 'len_xyz',     label: 'X*Y*Z',      get: (e) => txt(e.len_xyz) || null },
+    { key: 'area',        label: 'Area',       get: (e) => Number(e.area || 0) > 0 ? fmt2(e.area) + ' m²' : null },
+    { key: 'volume',      label: 'Volume',     get: (e) => Number(e.volume || 0) > 0 ? fmt3(e.volume) + ' m³' : null },
+    { key: 'comprimento', label: 'Comprimento',get: (e) => Number(e.comprimento || 0) > 0 ? fmt2(e.comprimento) + ' m' : null },
+    { key: 'quantidade',  label: 'Qtd',        get: (e) => txt(e.quantidade || e.quantity) || '1' },
+    { key: 'custo',       label: 'Custo',      get: (e) => Number(e.total || 0) > 0 ? 'R$ ' + fmt2(e.total) : null },
+    { key: 'peso',        label: 'Peso',       get: (e) => Number(e.slab_weight_kg || 0) > 0 ? fmt2(e.slab_weight_kg) + ' kg' : null }
+  ];
+
+  const isActive = (key) => {
+    if (typeof window.KPIConfig === 'undefined') { return true; }
+    return window.KPIConfig.isVisible(key);
+  };
+
+  const lines = [];
+  const seen = new Set();
+  FIELDS.forEach((f) => {
+    if (lines.length >= 6) { return; }
+    if (!isActive(f.key)) { return; }
+    if (seen.has(f.label)) { return; }
+    const v = f.get(element);
+    if (v == null || v === '' || v === '-') { return; }
+    seen.add(f.label);
+    lines.push(f.label + ': ' + v);
+  });
+
+  return lines.join('\n');
+}
+
 function selectElementByKey(key, focusInModel) {
   'use strict';
   const wanted = String(key || '').trim();
@@ -3591,9 +3640,10 @@ function selectElementByKey(key, focusInModel) {
       if (shouldAutoZoom && typeof Bridge.zoomSelection === 'function') {
         Bridge.zoomSelection();
       }
-      // Overlay com bounding box + dimensoes (feature inspirada no 5D+)
+      // Label informativo flutuante (feature inspirada no 5D+)
       if (typeof Bridge.showDimensionLabel === 'function') {
-        Bridge.showDimensionLabel(wanted);
+        const labelText = buildElementInfoLabel(selected);
+        Bridge.showDimensionLabel(wanted, labelText);
       }
     } else {
       focusEntity(wanted);

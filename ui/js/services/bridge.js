@@ -123,13 +123,14 @@ const Bridge = (() => {
     },
 
     /**
-     * Mostra etiqueta de dimensoes (bounding box + label X x Y x Z)
-     * sobre o elemento no modelo SketchUp.
+     * Mostra etiqueta informativa flutuante sobre o elemento no SketchUp.
      * @param {string} entityId - persistent_id da entidade
+     * @param {string} labelText - texto multilinha (separado por \n) ou null
+     *                             para usar dimensoes padrao "X x Y x Z m"
      */
-    showDimensionLabel(entityId) {
+    showDimensionLabel(entityId, labelText) {
       if (!entityId) return;
-      _safeCall('show_dimension_label', [String(entityId)]);
+      _safeCall('show_dimension_label', [String(entityId), String(labelText || '')]);
     },
 
     /**

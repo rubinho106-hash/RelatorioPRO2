@@ -260,8 +260,8 @@ module RelatorioPRO
 			puts("[RelatorioPRO] #{message}")
 		end
 
-		dialog.add_action_callback("show_dimension_label") do |_ctx, pid|
-			show_dimension_label_for(pid)
+		dialog.add_action_callback("show_dimension_label") do |_ctx, pid, label_text|
+			show_dimension_label_for(pid, label_text)
 		end
 
 		dialog.add_action_callback("clear_dimension_label") do |_ctx|
@@ -277,7 +277,7 @@ module RelatorioPRO
 		@dimension_label_tool ||= Tools::DimensionLabelTool.new
 	end
 
-	def show_dimension_label_for(pid)
+	def show_dimension_label_for(pid, label_text = nil)
 		model = Sketchup.active_model
 		return unless model
 
@@ -285,13 +285,12 @@ module RelatorioPRO
 		return unless entity && entity.valid?
 
 		tool = dimension_label_tool
-		tool.set_entities([entity])
+		tool.set_entities([entity], label_text)
 
 		# Ativa a tool apenas se nao for a atual (evita re-ativar a cada clique)
 		if model.tools.active_tool_name != "DimensionLabelTool"
 			model.select_tool(tool)
 		else
-			# Forca redraw
 			view = model.active_view
 			view.invalidate if view
 		end
