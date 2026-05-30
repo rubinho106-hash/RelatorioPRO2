@@ -704,6 +704,26 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
       margin-bottom: 14px;
+      /* Altura para ~6 linhas (18 cards visiveis), demais via scroll */
+      max-height: calc(100vh - 240px);
+      overflow-y: auto;
+      padding-right: 6px;
+    }
+
+    /* Scrollbar custom no tema escuro */
+    .global-summary::-webkit-scrollbar {
+      width: 8px;
+    }
+    .global-summary::-webkit-scrollbar-track {
+      background: #0f1419;
+      border-radius: 4px;
+    }
+    .global-summary::-webkit-scrollbar-thumb {
+      background: #2d3540;
+      border-radius: 4px;
+    }
+    .global-summary::-webkit-scrollbar-thumb:hover {
+      background: #3a4452;
     }
 
     .summary-card {
