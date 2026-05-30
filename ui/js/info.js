@@ -3591,6 +3591,10 @@ function selectElementByKey(key, focusInModel) {
       if (shouldAutoZoom && typeof Bridge.zoomSelection === 'function') {
         Bridge.zoomSelection();
       }
+      // Overlay com bounding box + dimensoes (feature inspirada no 5D+)
+      if (typeof Bridge.showDimensionLabel === 'function') {
+        Bridge.showDimensionLabel(wanted);
+      }
     } else {
       focusEntity(wanted);
     }

@@ -123,6 +123,23 @@ const Bridge = (() => {
     },
 
     /**
+     * Mostra etiqueta de dimensoes (bounding box + label X x Y x Z)
+     * sobre o elemento no modelo SketchUp.
+     * @param {string} entityId - persistent_id da entidade
+     */
+    showDimensionLabel(entityId) {
+      if (!entityId) return;
+      _safeCall('show_dimension_label', [String(entityId)]);
+    },
+
+    /**
+     * Remove a etiqueta de dimensoes do modelo.
+     */
+    clearDimensionLabel() {
+      _safeCall('clear_dimension_label', []);
+    },
+
+    /**
      * Select multiple entities
      * @param {Array<string>} entityIds - Array of entity IDs
      */

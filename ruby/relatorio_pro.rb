@@ -3,6 +3,7 @@ require_relative "ui"
 require_relative "bim/resolver"
 require_relative "bim/selection_engine"
 require_relative "bim/visibility_engine"
+require_relative "tools/dimension_label_tool"
 require "json"
 require "set"
 require "time"
@@ -258,6 +259,58 @@ module RelatorioPRO
 		dialog.add_action_callback("log") do |_ctx, message|
 			puts("[RelatorioPRO] #{message}")
 		end
+
+		dialog.add_action_callback("show_dimension_label") do |_ctx, pid|
+			show_dimension_label_for(pid)
+		end
+
+		dialog.add_action_callback("clear_dimension_label") do |_ctx|
+			clear_dimension_label
+		end
+	end
+
+	# === DIMENSION LABEL OVERLAY =================================================
+	# Inspirado no plugin 5D+ Auto Info: destaca elemento com bounding box
+	# pontilhado e etiqueta verde de dimensoes X x Y x Z.
+
+	def dimension_label_tool
+		@dimension_label_tool ||= Tools::DimensionLabelTool.new
+	end
+
+	def show_dimension_label_for(pid)
+		model = Sketchup.active_model
+		return unless model
+
+		entity = model.find_entity_by_persistent_id(pid.to_i)
+		return unless entity && entity.valid?
+
+		tool = dimension_label_tool
+		tool.set_entities([entity])
+
+		# Ativa a tool apenas se nao for a atual (evita re-ativar a cada clique)
+		if model.tools.active_tool_name != "DimensionLabelTool"
+			model.select_tool(tool)
+		else
+			# Forca redraw
+			view = model.active_view
+			view.invalidate if view
+		end
+	rescue StandardError => e
+		puts("[RelatorioPRO] show_dimension_label_for error: #{e.class}: #{e.message}")
+	end
+
+	def clear_dimension_label
+		return unless @dimension_label_tool
+
+		@dimension_label_tool.clear
+		model = Sketchup.active_model
+		return unless model
+
+		if model.tools.active_tool_name == "DimensionLabelTool"
+			model.select_tool(nil)
+		end
+	rescue StandardError => e
+		puts("[RelatorioPRO] clear_dimension_label error: #{e.class}: #{e.message}")
 	end
 
 	def bim_trace(event_name, payload = {})
