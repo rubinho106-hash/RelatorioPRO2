@@ -269,11 +269,9 @@ module RelatorioPRO
 		end
 
 		dialog.add_action_callback("smart_focus") do |_ctx, pid|
-			puts("[callback smart_focus] pid=#{pid.inspect}")
 			model = Sketchup.active_model
 			next unless model
 			entity = model.find_entity_by_persistent_id(pid.to_i)
-			puts("[callback smart_focus] entity=#{entity ? entity.class : 'nil'}")
 			smart_focus_on_entity(entity) if entity && entity.valid?
 		end
 	end
@@ -418,35 +416,21 @@ module RelatorioPRO
 	#   - Linear (X >> Y,Z): viga → vista lateral isometrica
 	#   - Cubico: isometrica padrao 3/4
 	def smart_focus_on_entity(entity)
-		puts("[smart_focus] ENTROU — entity=#{entity.inspect}")
 		model = Sketchup.active_model
-		unless model
-			puts("[smart_focus] sem active_model"); return false
-		end
+		return false unless model
 
 		view = model.active_view
-		unless view
-			puts("[smart_focus] sem active_view"); return false
-		end
-		unless entity && entity.valid?
-			puts("[smart_focus] entity invalida"); return false
-		end
+		return false unless view && entity && entity.valid?
 
 		bb = world_bounds_of(entity)
-		unless bb
-			puts("[smart_focus] world_bounds_of retornou nil"); return false
-		end
+		return false unless bb
 
 		target = bb.center
 		w = bb.width.to_f
 		d = bb.depth.to_f
 		h = bb.height.to_f
-		puts("[smart_focus] bbox(inches): w=#{w.round(2)} d=#{d.round(2)} h=#{h.round(2)}")
-
 		diag = Math.sqrt(w * w + d * d + h * h)
-		if diag < 0.001
-			puts("[smart_focus] diag muito pequena: #{diag}"); return false
-		end
+		return false if diag < 0.001
 
 		max_horizontal = [w, d].max
 		shape =
@@ -461,7 +445,6 @@ module RelatorioPRO
 			else
 				:isometric
 			end
-		puts("[smart_focus] shape=#{shape}")
 
 		dir =
 			case shape
@@ -474,22 +457,16 @@ module RelatorioPRO
 		dir.normalize!
 
 		camera = view.camera
-		# Garante modo perspectiva — em paralelo, FOV nao funciona
-		unless camera.perspective?
-			puts("[smart_focus] forcando camera para perspective")
-			camera.perspective = true
-		end
+		camera.perspective = true unless camera.perspective?
 
 		fov_deg = (camera.fov || 35).to_f
 		fov_deg = 35.0 if fov_deg <= 0
 		fov_rad = fov_deg * Math::PI / 180.0
 		distance = (diag * 0.5) / Math.tan(fov_rad / 2.0) / 0.6
 		distance = [distance, diag * 1.2].max
-		puts("[smart_focus] fov=#{fov_deg} diag=#{diag.round(2)} distance=#{distance.round(2)}")
 
 		new_eye = target.offset(dir.reverse, distance)
 		new_up  = Geom::Vector3d.new(0, 0, 1)
-		puts("[smart_focus] target=#{target.inspect} new_eye=#{new_eye.inspect}")
 
 		animate_camera_transition(
 			view,
@@ -500,13 +477,11 @@ module RelatorioPRO
 			CAMERA_FOCUS_STEPS
 		)
 
-		puts("[smart_focus] animacao agendada com #{CAMERA_FOCUS_STEPS} steps")
 		bim_trace("smart_focus", shape: shape, w_m: (w * INCH_TO_M).round(2),
 								 d_m: (d * INCH_TO_M).round(2), h_m: (h * INCH_TO_M).round(2))
 		true
 	rescue StandardError => e
 		puts("[RelatorioPRO] smart_focus_on_entity error: #{e.class}: #{e.message}")
-		puts(e.backtrace.first(5).join("\n"))
 		false
 	end
 
