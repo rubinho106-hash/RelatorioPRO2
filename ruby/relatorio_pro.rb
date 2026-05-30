@@ -267,6 +267,13 @@ module RelatorioPRO
 		dialog.add_action_callback("clear_dimension_label") do |_ctx|
 			clear_dimension_label
 		end
+
+		dialog.add_action_callback("smart_focus") do |_ctx, pid|
+			model = Sketchup.active_model
+			next unless model
+			entity = model.find_entity_by_persistent_id(pid.to_i)
+			smart_focus_on_entity(entity) if entity && entity.valid?
+		end
 	end
 
 	# === DIMENSION LABEL OVERLAY =================================================
@@ -398,6 +405,117 @@ module RelatorioPRO
 
 	def collect_entities_by_tag(model, tag_name)
 		Bim::Resolver.collect_entities_by_tag(model, tag_name)
+	end
+
+	# =============================================================================
+	# SMART FOCUS — escolhe o melhor angulo de camera baseado na geometria
+	# =============================================================================
+	# Analisa as dimensoes X/Y/Z do elemento e decide:
+	#   - Vertical (Z >> X,Y): pilar → vista frontal-isometrica
+	#   - Horizontal (X*Y >> Z): laje → vista superior em angulo
+	#   - Linear (X >> Y,Z): viga → vista lateral isometrica
+	#   - Cubico: isometrica padrao 3/4
+	def smart_focus_on_entity(entity)
+		model = Sketchup.active_model
+		return false unless model
+
+		view = model.active_view
+		return false unless view && entity && entity.valid?
+
+		bb = world_bounds_of(entity)
+		return false unless bb
+
+		target = bb.center
+		w = bb.width.to_f   # X
+		d = bb.depth.to_f   # Y
+		h = bb.height.to_f  # Z
+
+		# Diagonal do bbox em polegadas — base para distancia da camera
+		diag = Math.sqrt(w * w + d * d + h * h)
+		return false if diag < 0.001
+
+		# Heuristica de classificacao
+		max_horizontal = [w, d].max
+		shape =
+			if h > 1.8 * max_horizontal
+				:vertical   # pilar
+			elsif (w * d) > 2.5 * (h * [w, d].max)
+				:horizontal # laje
+			elsif w > 1.8 * d && w > 1.8 * h
+				:linear_x   # viga ao longo de X
+			elsif d > 1.8 * w && d > 1.8 * h
+				:linear_y   # viga ao longo de Y
+			else
+				:isometric
+			end
+
+		# Direcao do eye relativa ao target, normalizada
+		# Vetor (eye -> target) = direcao da camera
+		dir =
+			case shape
+			when :vertical
+				Geom::Vector3d.new( 1.0, -1.5,  0.4)  # olhar frontal-isometrico
+			when :horizontal
+				Geom::Vector3d.new( 0.8, -0.8,  1.4)  # de cima em angulo
+			when :linear_x
+				Geom::Vector3d.new( 0.2, -1.5,  0.6)  # lateral, olhando o lado longo
+			when :linear_y
+				Geom::Vector3d.new(-1.5, -0.2,  0.6)
+			else
+				Geom::Vector3d.new( 1.0, -1.0,  0.8)  # isometrica 3/4 classica
+			end
+		dir.normalize!
+
+		# Distancia: diag * fator de margem (~ campo de visao + folga visual)
+		fov_rad = (view.camera.fov || 35).to_f * Math::PI / 180.0
+		fov_rad = 35.0 * Math::PI / 180.0 if fov_rad <= 0
+		# distance suficiente para o objeto ocupar ~60% do frame
+		distance = (diag * 0.5) / Math.tan(fov_rad / 2.0) / 0.6
+		distance = [distance, diag * 1.2].max
+
+		new_eye = target.offset(dir.reverse, distance)
+		new_up  = Geom::Vector3d.new(0, 0, 1)
+
+		camera = view.camera
+		animate_camera_transition(
+			view,
+			camera.eye, new_eye,
+			camera.target, target,
+			new_up,
+			CAMERA_FOCUS_DURATION_SECONDS,
+			CAMERA_FOCUS_STEPS
+		)
+
+		bim_trace("smart_focus", shape: shape, w_m: (w * INCH_TO_M).round(2),
+								 d_m: (d * INCH_TO_M).round(2), h_m: (h * INCH_TO_M).round(2))
+		true
+	rescue StandardError => e
+		puts("[RelatorioPRO] smart_focus_on_entity error: #{e.class}: #{e.message}")
+		false
+	end
+
+	def world_bounds_of(entity)
+		if entity.respond_to?(:transformation) && entity.respond_to?(:definition) && entity.definition
+			local_bb = entity.definition.bounds
+			t = entity.transformation
+			bb = Geom::BoundingBox.new
+			# 8 cantos do bbox local transformados
+			[
+				local_bb.min,
+				Geom::Point3d.new(local_bb.max.x, local_bb.min.y, local_bb.min.z),
+				Geom::Point3d.new(local_bb.min.x, local_bb.max.y, local_bb.min.z),
+				Geom::Point3d.new(local_bb.min.x, local_bb.min.y, local_bb.max.z),
+				Geom::Point3d.new(local_bb.max.x, local_bb.max.y, local_bb.min.z),
+				Geom::Point3d.new(local_bb.max.x, local_bb.min.y, local_bb.max.z),
+				Geom::Point3d.new(local_bb.min.x, local_bb.max.y, local_bb.max.z),
+				local_bb.max
+			].each { |p| bb.add(p.transform(t)) }
+			bb
+		else
+			entity.bounds
+		end
+	rescue StandardError
+		entity.bounds
 	end
 
 	def focus_camera_on_entities(entities, smooth: true)

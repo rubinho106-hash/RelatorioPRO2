@@ -3637,8 +3637,14 @@ function selectElementByKey(key, focusInModel) {
     // ✅ NOVO: Usar Bridge em vez de chamar focusEntity diretamente
     if (typeof Bridge !== 'undefined' && Bridge.highlightEntity) {
       Bridge.highlightEntity(wanted);
-      if (shouldAutoZoom && typeof Bridge.zoomSelection === 'function') {
-        Bridge.zoomSelection();
+      if (shouldAutoZoom) {
+        // Smart focus inteligente: escolhe o melhor angulo baseado na
+        // geometria do elemento (pilar/laje/viga/cubico)
+        if (typeof Bridge.smartFocus === 'function') {
+          Bridge.smartFocus(wanted);
+        } else if (typeof Bridge.zoomSelection === 'function') {
+          Bridge.zoomSelection();
+        }
       }
       // Label informativo flutuante (feature inspirada no 5D+)
       if (typeof Bridge.showDimensionLabel === 'function') {

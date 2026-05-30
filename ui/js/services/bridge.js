@@ -141,6 +141,17 @@ const Bridge = (() => {
     },
 
     /**
+     * Smart focus: enquadra o elemento escolhendo o melhor angulo de camera
+     * baseado nas dimensoes (pilar -> frontal, laje -> superior, viga ->
+     * lateral, etc). Anima suavemente.
+     * @param {string} entityId - persistent_id
+     */
+    smartFocus(entityId) {
+      if (!entityId) return;
+      _safeCall('smart_focus', [String(entityId)]);
+    },
+
+    /**
      * Select multiple entities
      * @param {Array<string>} entityIds - Array of entity IDs
      */
